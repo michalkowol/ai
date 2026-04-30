@@ -10,7 +10,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown argument: $1"
-            echo "Usage: $0 --dir /path/to/directory [--resume <token>] [--bash]"
+            echo "Usage: $0 --dir /path/to/directory"
             exit 1
             ;;
     esac
@@ -18,7 +18,7 @@ done
 
 if [ -z "$LOCAL_DIR" ]; then
     echo "Error: --dir argument is required!"
-    echo "Usage: $0 --dir /path/to/directory [--resume <token>] [--bash]"
+    echo "Usage: $0 --dir /path/to/directory"
     exit 1
 fi
 
