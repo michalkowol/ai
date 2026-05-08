@@ -1,0 +1,60 @@
+#!/bin/bash
+
+set -e
+
+TOOL="claude"
+DIR=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --claude)
+            TOOL="claude"
+            shift
+            ;;
+        --cursor)
+            TOOL="cursor"
+            shift
+            ;;
+        --bash)
+            TOOL="bash"
+            shift
+            ;;
+        --*)
+            echo "Unknown option: $1" >&2
+            echo "Usage: ai [--claude|--cursor|--bash] [path]" >&2
+            exit 1
+            ;;
+        *)
+            if [ -n "$DIR" ]; then
+                echo "Unexpected argument: $1" >&2
+                echo "Usage: ai [--claude|--cursor|--bash] [path]" >&2
+                exit 1
+            fi
+            DIR="$1"
+            shift
+            ;;
+    esac
+done
+
+DIR="${DIR:-.}"
+WORKTREE_DIR="$(realpath "$DIR")"
+
+if [ ! -d "$WORKTREE_DIR" ]; then
+    echo "Error: Directory '$WORKTREE_DIR' does not exist!" >&2
+    exit 1
+fi
+
+cd ~/dev/ai
+
+docker build -q -t ai . > /dev/null
+
+case "$TOOL" in
+    claude) CMD=("claude" "--enable-auto-mode") ;;
+    cursor) CMD=("cursor-agent" "--force") ;;
+    bash)   CMD=("bash") ;;
+esac
+
+docker run -it \
+    -v "$HOME/.gradle:/home/ubuntu/.gradle" \
+    -v "$WORKTREE_DIR:/workspace" \
+    ai "${CMD[@]}"
