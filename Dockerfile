@@ -9,9 +9,6 @@ USER ubuntu
 RUN curl https://cursor.com/install -fsS | bash
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
-COPY --chown=ubuntu:ubuntu claude/ /home/ubuntu/
-COPY --chown=ubuntu:ubuntu cursor/ /home/ubuntu/
-
 ENV PATH="/home/ubuntu/.local/bin:$PATH"
 
 RUN echo 'echo -e "\\nTo run the Claude, type: \\033[1;32mclaude --enable-auto-mode\\033[0m"' >> /home/ubuntu/.bashrc

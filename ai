@@ -44,9 +44,33 @@ if [ ! -d "$WORKTREE_DIR" ]; then
     exit 1
 fi
 
-cd ~/dev/ai
+EXTRA_MOUNTS=()
+if [ -f "$WORKTREE_DIR/.git" ]; then
+    GIT_COMMON_DIR="$(cd "$WORKTREE_DIR" && git rev-parse --git-common-dir 2>/dev/null || true)"
+    if [ -n "$GIT_COMMON_DIR" ]; then
+        case "$GIT_COMMON_DIR" in
+            /*) ;;
+            *) GIT_COMMON_DIR="$WORKTREE_DIR/$GIT_COMMON_DIR" ;;
+        esac
+        GIT_COMMON_DIR="$(realpath "$GIT_COMMON_DIR")"
+        EXTRA_MOUNTS+=(-v "$GIT_COMMON_DIR:$GIT_COMMON_DIR:ro")
+    fi
+fi
+
+AI_DIR=~/dev/ai
+cd "$AI_DIR"
 
 docker build -q -t ai . > /dev/null
+
+CLAUDE_MOUNTS=(
+    -v "$AI_DIR/claude/.claude:/home/ubuntu/.claude"
+    -v "$AI_DIR/claude/.claude.json:/home/ubuntu/.claude.json"
+)
+
+CURSOR_MOUNTS=(
+    -v "$AI_DIR/cursor/.cursor:/home/ubuntu/.cursor"
+    -v "$AI_DIR/cursor/.config/cursor:/home/ubuntu/.config/cursor"
+)
 
 case "$TOOL" in
     claude) CMD=("claude" "--enable-auto-mode") ;;
@@ -55,6 +79,10 @@ case "$TOOL" in
 esac
 
 docker run -it \
-    -v "$HOME/.gradle:/home/ubuntu/.gradle" \
+    -v "$HOME/.gradle:/home/ubuntu/.gradle:ro" \
+    -v "$HOME/.m2:/home/ubuntu/.m2:ro" \
     -v "$WORKTREE_DIR:/workspace" \
+    "${CLAUDE_MOUNTS[@]}" \
+    "${CURSOR_MOUNTS[@]}" \
+    "${EXTRA_MOUNTS[@]}" \
     ai "${CMD[@]}"

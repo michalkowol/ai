@@ -1,0 +1,10 @@
+.DS_Store
+
+claude/.claude/*
+!claude/.claude/.gitkeep
+
+cursor/.cursor/*
+!cursor/.cursor/.gitkeep
+
+cursor/.config/cursor/*
+!cursor/.config/cursor/.gitkeep
