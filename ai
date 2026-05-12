@@ -2,7 +2,7 @@
 
 set -e
 
-TOOL="claude"
+TOOL="bash"
 DIR=""
 
 while [ $# -gt 0 ]; do
@@ -73,7 +73,7 @@ CURSOR_MOUNTS=(
 )
 
 case "$TOOL" in
-    claude) CMD=("claude" "--enable-auto-mode") ;;
+    claude) CMD=("claude" "--dangerously-skip-permissions") ;;
     cursor) CMD=("cursor-agent" "--force") ;;
     bash)   CMD=("bash") ;;
 esac

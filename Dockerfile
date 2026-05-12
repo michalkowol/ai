@@ -10,8 +10,13 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 
 ENV PATH="/home/ubuntu/.local/bin:$PATH"
 
-RUN echo 'echo -e "\\nTo run the Claude, type: \\033[1;32mclaude --enable-auto-mode\\033[0m"' >> /home/ubuntu/.bashrc
-RUN echo 'echo -e "To run the Cursor, type: \\033[1;32mcursor-agent --force\\033[0m\\n"' >> /home/ubuntu/.bashrc
+RUN echo 'echo -e "\\nTo run Claude with skipped permissions, type: \\033[1;32mclaude --dangerously-skip-permissions\\033[0m"' >> /home/ubuntu/.bashrc
+RUN echo 'echo -e "To run the Cursor, type: \\033[1;32mcursor-agent --force\\033[0m"' >> /home/ubuntu/.bashrc
+RUN echo 'echo -e "To run the Claude, type: \\033[1;32mclaude --enable-auto-mode\\033[0m\\n"' >> /home/ubuntu/.bashrc
+
+RUN echo 'claude --enable-auto-mode' >> /home/ubuntu/.bash_history \
+    && echo 'cursor-agent --force' >> /home/ubuntu/.bash_history \
+    && echo 'claude --dangerously-skip-permissions' >> /home/ubuntu/.bash_history
 
 WORKDIR /workspace
 CMD ["bash"]
