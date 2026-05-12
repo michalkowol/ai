@@ -53,7 +53,7 @@ if [ -f "$WORKTREE_DIR/.git" ]; then
             *) GIT_COMMON_DIR="$WORKTREE_DIR/$GIT_COMMON_DIR" ;;
         esac
         GIT_COMMON_DIR="$(realpath "$GIT_COMMON_DIR")"
-        EXTRA_MOUNTS+=(-v "$GIT_COMMON_DIR:$GIT_COMMON_DIR:ro")
+        EXTRA_MOUNTS+=(-v "$GIT_COMMON_DIR:$GIT_COMMON_DIR")
     fi
 fi
 
@@ -84,8 +84,8 @@ docker run -it \
     -v /var/run/docker.sock:/var/run/docker.sock \
     --group-add "$DOCKER_SOCK_GID" \
     --add-host=host.docker.internal:host-gateway \
-    -v "$HOME/.gradle:/home/ubuntu/.gradle:ro" \
-    -v "$HOME/.m2:/home/ubuntu/.m2:ro" \
+    -v "$HOME/.gradle:/home/ubuntu/.gradle" \
+    -v "$HOME/.m2:/home/ubuntu/.m2" \
     -v "$WORKTREE_DIR:/workspace" \
     "${CLAUDE_MOUNTS[@]}" \
     "${CURSOR_MOUNTS[@]}" \
