@@ -67,6 +67,8 @@ CLAUDE_MOUNTS=(
     -v "$AI_DIR/claude/.claude.json:/home/ubuntu/.claude.json"
     -v "$AI_DIR/common/commands:/home/ubuntu/.claude/commands"
     -v "$AI_DIR/common/skills:/home/ubuntu/.claude/skills"
+    -v "$AI_DIR/common/rules:/home/ubuntu/.claude/rules"
+    -v "$AI_DIR/common/mcp.json:/workspace/.mcp.json"
 )
 
 CURSOR_MOUNTS=(
@@ -74,6 +76,8 @@ CURSOR_MOUNTS=(
     -v "$AI_DIR/cursor/.config/cursor:/home/ubuntu/.config/cursor"
     -v "$AI_DIR/common/commands:/home/ubuntu/.cursor/commands"
     -v "$AI_DIR/common/skills:/home/ubuntu/.cursor/skills"
+    -v "$AI_DIR/common/rules:/home/ubuntu/.cursor/rules"
+    -v "$AI_DIR/common/mcp.json:/home/ubuntu/.cursor/mcp.json"
 )
 
 case "$TOOL" in
