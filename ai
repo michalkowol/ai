@@ -78,7 +78,12 @@ case "$TOOL" in
     bash)   CMD=("bash") ;;
 esac
 
+DOCKER_SOCK_GID=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock ai stat -c '%g' /var/run/docker.sock)
+
 docker run -it \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    --group-add "$DOCKER_SOCK_GID" \
+    --add-host=host.docker.internal:host-gateway \
     -v "$HOME/.gradle:/home/ubuntu/.gradle:ro" \
     -v "$HOME/.m2:/home/ubuntu/.m2:ro" \
     -v "$WORKTREE_DIR:/workspace" \

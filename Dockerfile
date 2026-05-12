@@ -1,8 +1,7 @@
 FROM eclipse-temurin:22
 
-RUN apt-get update && apt-get install -y curl git \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /workspace && chown ubuntu:ubuntu /workspace
+RUN apt-get update && apt-get install -y curl git docker.io \
+    && rm -rf /var/lib/apt/lists/*
 
 USER ubuntu
 
