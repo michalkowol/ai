@@ -65,11 +65,15 @@ docker build -q -t ai . > /dev/null
 CLAUDE_MOUNTS=(
     -v "$AI_DIR/claude/.claude:/home/ubuntu/.claude"
     -v "$AI_DIR/claude/.claude.json:/home/ubuntu/.claude.json"
+    -v "$AI_DIR/common/commands:/home/ubuntu/.claude/commands"
+    -v "$AI_DIR/common/skills:/home/ubuntu/.claude/skills"
 )
 
 CURSOR_MOUNTS=(
     -v "$AI_DIR/cursor/.cursor:/home/ubuntu/.cursor"
     -v "$AI_DIR/cursor/.config/cursor:/home/ubuntu/.config/cursor"
+    -v "$AI_DIR/common/commands:/home/ubuntu/.cursor/commands"
+    -v "$AI_DIR/common/skills:/home/ubuntu/.cursor/skills"
 )
 
 case "$TOOL" in
