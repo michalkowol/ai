@@ -86,7 +86,7 @@ esac
 
 DOCKER_SOCK_GID=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock ai stat -c '%g' /var/run/docker.sock)
 
-docker run -it \
+docker run -it --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
     --group-add "$DOCKER_SOCK_GID" \
     --add-host=host.docker.internal:host-gateway \
