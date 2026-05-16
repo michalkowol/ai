@@ -1,4 +1,5 @@
-FROM eclipse-temurin:25
+ARG JAVA_VERSION=25
+FROM eclipse-temurin:${JAVA_VERSION}
 
 RUN apt-get update && apt-get install -y curl git docker.io \
     && rm -rf /var/lib/apt/lists/*

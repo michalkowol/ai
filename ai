@@ -4,6 +4,7 @@ set -e
 
 TOOL="claude"
 DIR=""
+JAVA_VERSION="25"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -19,15 +20,27 @@ while [ $# -gt 0 ]; do
             TOOL="bash"
             shift
             ;;
+        --java)
+            if [ -z "$2" ]; then
+                echo "Error: --java requires a version argument" >&2
+                exit 1
+            fi
+            JAVA_VERSION="$2"
+            shift 2
+            ;;
+        --java=*)
+            JAVA_VERSION="${1#--java=}"
+            shift
+            ;;
         --*)
             echo "Unknown option: $1" >&2
-            echo "Usage: ai [--claude|--cursor|--bash] [path]" >&2
+            echo "Usage: ai [--claude|--cursor|--bash] [--java <version>] [path]" >&2
             exit 1
             ;;
         *)
             if [ -n "$DIR" ]; then
                 echo "Unexpected argument: $1" >&2
-                echo "Usage: ai [--claude|--cursor|--bash] [path]" >&2
+                echo "Usage: ai [--claude|--cursor|--bash] [--java <version>] [path]" >&2
                 exit 1
             fi
             DIR="$1"
@@ -60,7 +73,7 @@ fi
 AI_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 cd "$AI_DIR"
 
-docker build -q -t ai . > /dev/null
+docker build -q -t "ai:java${JAVA_VERSION}" --build-arg "JAVA_VERSION=${JAVA_VERSION}" . > /dev/null
 
 CLAUDE_MOUNTS=(
     -v "$AI_DIR/claude/.claude:/home/ubuntu/.claude"
@@ -96,4 +109,4 @@ docker run -it --rm \
     "${CLAUDE_MOUNTS[@]}" \
     "${CURSOR_MOUNTS[@]}" \
     "${EXTRA_MOUNTS[@]}" \
-    ai "${CMD[@]}"
+    "ai:java${JAVA_VERSION}" "${CMD[@]}"
