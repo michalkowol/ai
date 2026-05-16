@@ -11,15 +11,29 @@ prompts, slash commands, and configuration across both tools.
 ## Requirements
 
 - Docker
-- A clone of this repo at `~/dev/ai`
+
+## Setup
+
+```bash
+git clone https://github.com/michalkowol/ai.git
+cd ai
+./ai
+```
+
+You can clone the repo anywhere — the launcher resolves its own location. For
+convenience, symlink it onto your `PATH`:
+
+```bash
+ln -s "$(pwd)/ai" ~/.local/bin/ai
+```
 
 ## Usage
 
 ```bash
-./ai                 # Claude Code (default), current directory
-./ai --claude path/  # Claude Code in a specific directory
-./ai --cursor path/  # Cursor Agent
-./ai --bash path/    # Plain bash shell in the container
+ai                 # Claude Code (default), current directory
+ai --claude path/  # Claude Code in a specific directory
+ai --cursor path/  # Cursor Agent
+ai --bash path/    # Plain bash shell in the container
 ```
 
 The given path is mounted as `/workspace` inside the container. Git worktrees

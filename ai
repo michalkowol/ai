@@ -57,7 +57,7 @@ if [ -f "$WORKTREE_DIR/.git" ]; then
     fi
 fi
 
-AI_DIR=~/dev/ai
+AI_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 cd "$AI_DIR"
 
 docker build -q -t ai . > /dev/null
