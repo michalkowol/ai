@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21
+FROM eclipse-temurin:25
 
 RUN apt-get update && apt-get install -y curl git docker.io \
     && rm -rf /var/lib/apt/lists/*
