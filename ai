@@ -73,6 +73,11 @@ fi
 AI_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 cd "$AI_DIR"
 
+GIT_MOUNT=()
+if [ -f "$AI_DIR/gitconfig.container" ]; then
+    GIT_MOUNT+=(-v "$AI_DIR/gitconfig.container:/home/ubuntu/.gitconfig:ro")
+fi
+
 docker build -q -t "ai:java${JAVA_VERSION}" --build-arg "JAVA_VERSION=${JAVA_VERSION}" . > /dev/null
 
 CLAUDE_MOUNTS=(
@@ -110,4 +115,5 @@ docker run -it --rm \
     "${CLAUDE_MOUNTS[@]}" \
     "${CURSOR_MOUNTS[@]}" \
     "${EXTRA_MOUNTS[@]}" \
+    "${GIT_MOUNT[@]}" \
     "ai:java${JAVA_VERSION}" "${CMD[@]}"
