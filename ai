@@ -4,7 +4,10 @@ set -e
 
 TOOL="claude"
 DIR=""
-JAVA_VERSION="25"
+IMAGE_KIND="java"
+IMAGE_VERSION="25"
+
+USAGE="Usage: ai [--claude|--cursor|--bash] [--java <version>|--node <version>] [path]"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -25,22 +28,38 @@ while [ $# -gt 0 ]; do
                 echo "Error: --java requires a version argument" >&2
                 exit 1
             fi
-            JAVA_VERSION="$2"
+            IMAGE_KIND="java"
+            IMAGE_VERSION="$2"
             shift 2
             ;;
         --java=*)
-            JAVA_VERSION="${1#--java=}"
+            IMAGE_KIND="java"
+            IMAGE_VERSION="${1#--java=}"
+            shift
+            ;;
+        --node)
+            if [ -z "$2" ]; then
+                echo "Error: --node requires a version argument" >&2
+                exit 1
+            fi
+            IMAGE_KIND="node"
+            IMAGE_VERSION="$2"
+            shift 2
+            ;;
+        --node=*)
+            IMAGE_KIND="node"
+            IMAGE_VERSION="${1#--node=}"
             shift
             ;;
         --*)
             echo "Unknown option: $1" >&2
-            echo "Usage: ai [--claude|--cursor|--bash] [--java <version>] [path]" >&2
+            echo "$USAGE" >&2
             exit 1
             ;;
         *)
             if [ -n "$DIR" ]; then
                 echo "Unexpected argument: $1" >&2
-                echo "Usage: ai [--claude|--cursor|--bash] [--java <version>] [path]" >&2
+                echo "$USAGE" >&2
                 exit 1
             fi
             DIR="$1"
@@ -78,7 +97,14 @@ if [ -f "$AI_DIR/gitconfig.container" ]; then
     GIT_MOUNT+=(-v "$AI_DIR/gitconfig.container:/home/ubuntu/.gitconfig:ro")
 fi
 
-docker build -q -t "ai:java${JAVA_VERSION}" --build-arg "JAVA_VERSION=${JAVA_VERSION}" . > /dev/null
+case "$IMAGE_KIND" in
+    java) BASE_IMAGE="eclipse-temurin:${IMAGE_VERSION}" ;;
+    node) BASE_IMAGE="node:${IMAGE_VERSION}" ;;
+esac
+
+IMAGE_TAG="ai:${IMAGE_KIND}${IMAGE_VERSION}"
+
+docker build -q -t "$IMAGE_TAG" --build-arg "BASE_IMAGE=${BASE_IMAGE}" . > /dev/null
 
 CLAUDE_MOUNTS=(
     -v "$AI_DIR/claude/.claude:/home/ubuntu/.claude"
@@ -102,7 +128,7 @@ case "$TOOL" in
     bash)   CMD=("bash") ;;
 esac
 
-DOCKER_SOCK_GID=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock ai stat -c '%g' /var/run/docker.sock)
+DOCKER_SOCK_GID=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$IMAGE_TAG" stat -c '%g' /var/run/docker.sock)
 
 docker run -it --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
@@ -116,4 +142,4 @@ docker run -it --rm \
     "${CURSOR_MOUNTS[@]}" \
     "${EXTRA_MOUNTS[@]}" \
     "${GIT_MOUNT[@]}" \
-    "ai:java${JAVA_VERSION}" "${CMD[@]}"
+    "$IMAGE_TAG" "${CMD[@]}"

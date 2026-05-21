@@ -1,8 +1,11 @@
-ARG JAVA_VERSION=25
-FROM eclipse-temurin:${JAVA_VERSION}
+ARG BASE_IMAGE=eclipse-temurin:25
+FROM ${BASE_IMAGE}
 
 RUN apt-get update && apt-get install -y curl git docker.io \
     && rm -rf /var/lib/apt/lists/*
+
+RUN id ubuntu >/dev/null 2>&1 \
+    || (userdel -r node 2>/dev/null || true; useradd -m -u 1000 -s /bin/bash ubuntu)
 
 USER ubuntu
 
