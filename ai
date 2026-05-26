@@ -6,8 +6,9 @@ TOOL="claude"
 DIR=""
 IMAGE_KIND="java"
 IMAGE_VERSION="25"
+RESUME=""
 
-USAGE="Usage: ai [--claude|--cursor|--bash] [--java <version>|--node <version>] [path]"
+USAGE="Usage: ai [--claude|--cursor|--bash] [--java <version>|--node <version>] [--resume <session-id>] [path]"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -49,6 +50,18 @@ while [ $# -gt 0 ]; do
         --node=*)
             IMAGE_KIND="node"
             IMAGE_VERSION="${1#--node=}"
+            shift
+            ;;
+        --resume)
+            if [ -z "$2" ]; then
+                echo "Error: --resume requires a session id argument" >&2
+                exit 1
+            fi
+            RESUME="$2"
+            shift 2
+            ;;
+        --resume=*)
+            RESUME="${1#--resume=}"
             shift
             ;;
         --*)
@@ -127,6 +140,16 @@ case "$TOOL" in
     cursor) CMD=("cursor-agent" "--force") ;;
     bash)   CMD=("bash") ;;
 esac
+
+if [ -n "$RESUME" ]; then
+    case "$TOOL" in
+        claude|cursor) CMD+=("--resume" "$RESUME") ;;
+        *)
+            echo "Error: --resume is only supported with --claude or --cursor" >&2
+            exit 1
+            ;;
+    esac
+fi
 
 DOCKER_SOCK_GID=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$IMAGE_TAG" stat -c '%g' /var/run/docker.sock)
 
