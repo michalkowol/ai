@@ -7,8 +7,9 @@ DIR=""
 IMAGE_KIND="java"
 IMAGE_VERSION="25"
 RESUME=""
+UPDATE=""
 
-USAGE="Usage: ai [--claude|--cursor|--bash] [--java <version>|--node <version>] [--resume <session-id>] [path]"
+USAGE="Usage: ai [--claude|--cursor|--bash] [--java <version>|--node <version>] [--resume <session-id>] [--update] [path]"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -64,6 +65,10 @@ while [ $# -gt 0 ]; do
             RESUME="${1#--resume=}"
             shift
             ;;
+        --update)
+            UPDATE="1"
+            shift
+            ;;
         --*)
             echo "Unknown option: $1" >&2
             echo "$USAGE" >&2
@@ -87,6 +92,20 @@ WORKTREE_DIR="$(realpath "$DIR")"
 if [ ! -d "$WORKTREE_DIR" ]; then
     echo "Error: Directory '$WORKTREE_DIR' does not exist!" >&2
     exit 1
+fi
+
+GIT_ENV=()
+HOST_GIT_NAME="${GIT_AUTHOR_NAME:-$(git -C "$WORKTREE_DIR" config user.name 2>/dev/null || true)}"
+HOST_GIT_EMAIL="${GIT_AUTHOR_EMAIL:-$(git -C "$WORKTREE_DIR" config user.email 2>/dev/null || true)}"
+HOST_COMMIT_EMAIL="${GIT_COMMITTER_EMAIL:-$HOST_GIT_EMAIL}"
+if [ -n "$HOST_GIT_NAME" ]; then
+    GIT_ENV+=(-e "GIT_AUTHOR_NAME=$HOST_GIT_NAME")
+fi
+if [ -n "$HOST_GIT_EMAIL" ]; then
+    GIT_ENV+=(-e "GIT_AUTHOR_EMAIL=$HOST_GIT_EMAIL")
+fi
+if [ -n "$HOST_COMMIT_EMAIL" ]; then
+    GIT_ENV+=(-e "GIT_COMMITTER_EMAIL=$HOST_COMMIT_EMAIL")
 fi
 
 EXTRA_MOUNTS=()
@@ -117,7 +136,11 @@ esac
 
 IMAGE_TAG="ai:${IMAGE_KIND}${IMAGE_VERSION}"
 
-docker build -q -t "$IMAGE_TAG" --build-arg "BASE_IMAGE=${BASE_IMAGE}" . > /dev/null
+if [ -n "$UPDATE" ]; then
+    docker build -t "$IMAGE_TAG" --build-arg "BASE_IMAGE=${BASE_IMAGE}" --pull --no-cache .
+else
+    docker build -q -t "$IMAGE_TAG" --build-arg "BASE_IMAGE=${BASE_IMAGE}" . > /dev/null
+fi
 
 CLAUDE_MOUNTS=(
     -v "$AI_DIR/claude/.claude:/home/ubuntu/.claude"
@@ -160,6 +183,7 @@ docker run -it --rm \
     -v "$HOME/.gradle:/home/ubuntu/.gradle-ro:ro" \
     -e GRADLE_RO_DEP_CACHE=/home/ubuntu/.gradle-ro/caches \
     -v "$HOME/.m2:/home/ubuntu/.m2" \
+    "${GIT_ENV[@]}" \
     -v "$WORKTREE_DIR:/workspace" \
     "${CLAUDE_MOUNTS[@]}" \
     "${CURSOR_MOUNTS[@]}" \
