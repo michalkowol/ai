@@ -124,11 +124,6 @@ fi
 AI_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 cd "$AI_DIR"
 
-GIT_MOUNT=()
-if [ -f "$AI_DIR/gitconfig.container" ]; then
-    GIT_MOUNT+=(-v "$AI_DIR/gitconfig.container:/home/ubuntu/.gitconfig:ro")
-fi
-
 case "$IMAGE_KIND" in
     java) BASE_IMAGE="eclipse-temurin:${IMAGE_VERSION}" ;;
     node) BASE_IMAGE="node:${IMAGE_VERSION}" ;;
@@ -188,5 +183,4 @@ docker run -it --rm \
     "${CLAUDE_MOUNTS[@]}" \
     "${CURSOR_MOUNTS[@]}" \
     "${EXTRA_MOUNTS[@]}" \
-    "${GIT_MOUNT[@]}" \
     "$IMAGE_TAG" "${CMD[@]}"
