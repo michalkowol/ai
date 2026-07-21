@@ -154,7 +154,7 @@ CURSOR_MOUNTS=(
 )
 
 case "$TOOL" in
-    claude) CMD=("claude" "--dangerously-skip-permissions") ;;
+    claude) CMD=("claude" "--dangerously-skip-permissions" "--effort" "max") ;;
     cursor) CMD=("cursor-agent" "--force") ;;
     bash)   CMD=("bash") ;;
 esac
