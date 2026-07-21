@@ -5,7 +5,7 @@ set -e
 TOOL="claude"
 DIR=""
 IMAGE_KIND="java"
-IMAGE_VERSION="25"
+IMAGE_VERSION="21"
 RESUME=""
 UPDATE=""
 
@@ -154,7 +154,7 @@ CURSOR_MOUNTS=(
 )
 
 case "$TOOL" in
-    claude) CMD=("claude" "--dangerously-skip-permissions") ;;
+    claude) CMD=("claude" "--dangerously-skip-permissions" "--effort" "max") ;;
     cursor) CMD=("cursor-agent" "--force") ;;
     bash)   CMD=("bash") ;;
 esac
