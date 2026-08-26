@@ -36,6 +36,7 @@ ai --cursor path/    # Cursor Agent
 ai --bash path/      # Plain bash shell in the container
 ai --java 21         # Build the Java image with a specific version (default: 25)
 ai --node jod        # Build the Node.js image with a specific tag
+ai --model sonnet    # Pick the model (default: opus)
 ai --java 21 path/   # Combine with any tool/path
 ```
 
@@ -47,6 +48,11 @@ the built image as `ai:java<version>`. The `--node` flag selects the
 `node:<tag>` base image (e.g. `jod` for Node.js 22 LTS) and tags it as
 `ai:node<tag>`. The two flags are mutually exclusive; each variant is cached
 independently.
+
+The `--model` flag picks the model the agent runs with. Claude Code defaults to
+`opus`; pass e.g. `--model sonnet` to override. Cursor Agent uses its own model
+names (`gpt-5`, `sonnet-4-thinking`, …), so the flag is only forwarded there
+when given explicitly. It is not supported with `--bash`.
 
 ## Layout
 

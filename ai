@@ -6,10 +6,11 @@ TOOL="claude"
 DIR=""
 IMAGE_KIND="java"
 IMAGE_VERSION="21"
+MODEL=""
 RESUME=""
 UPDATE=""
 
-USAGE="Usage: ai [--claude|--cursor|--bash] [--java <version>|--node <version>] [--resume <session-id>] [--update] [path]"
+USAGE="Usage: ai [--claude|--cursor|--bash] [--java <version>|--node <version>] [--model <model>] [--resume <session-id>] [--update] [path]"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -51,6 +52,18 @@ while [ $# -gt 0 ]; do
         --node=*)
             IMAGE_KIND="node"
             IMAGE_VERSION="${1#--node=}"
+            shift
+            ;;
+        --model)
+            if [ -z "$2" ]; then
+                echo "Error: --model requires a model argument" >&2
+                exit 1
+            fi
+            MODEL="$2"
+            shift 2
+            ;;
+        --model=*)
+            MODEL="${1#--model=}"
             shift
             ;;
         --resume)
@@ -153,11 +166,25 @@ CURSOR_MOUNTS=(
     -v "$AI_DIR/common/rules:/home/ubuntu/.cursor/rules"
 )
 
+if [ "$TOOL" = "claude" ]; then
+    MODEL="${MODEL:-opus}"
+fi
+
 case "$TOOL" in
     claude) CMD=("claude" "--dangerously-skip-permissions" "--effort" "max") ;;
     cursor) CMD=("cursor-agent" "--force") ;;
     bash)   CMD=("bash") ;;
 esac
+
+if [ -n "$MODEL" ]; then
+    case "$TOOL" in
+        claude|cursor) CMD+=("--model" "$MODEL") ;;
+        *)
+            echo "Error: --model is only supported with --claude or --cursor" >&2
+            exit 1
+            ;;
+    esac
+fi
 
 if [ -n "$RESUME" ]; then
     case "$TOOL" in
