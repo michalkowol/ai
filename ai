@@ -121,9 +121,9 @@ if [ -n "$HOST_COMMIT_EMAIL" ]; then
     GIT_ENV+=(-e "GIT_COMMITTER_EMAIL=$HOST_COMMIT_EMAIL")
 fi
 
-ENV_FILE=()
+SETTINGS_ENV=()
 if [ -f "$HOME/.ai/settings.env" ]; then
-    ENV_FILE+=(--env-file "$HOME/.ai/settings.env")
+    SETTINGS_ENV+=(--env-file "$HOME/.ai/settings.env")
 fi
 
 EXTRA_MOUNTS=()
@@ -212,7 +212,7 @@ docker run -it --rm \
     -e GRADLE_RO_DEP_CACHE=/home/ubuntu/.gradle-ro/caches \
     -v "$HOME/.m2:/home/ubuntu/.m2" \
     "${GIT_ENV[@]}" \
-    "${ENV_FILE[@]}" \
+    "${SETTINGS_ENV[@]}" \
     -v "$WORKTREE_DIR:/workspace" \
     -v "$AI_DIR/common/hooks:/opt/ai/hooks:ro" \
     "${CLAUDE_MOUNTS[@]}" \

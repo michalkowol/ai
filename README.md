@@ -118,6 +118,10 @@ variable you put there reaches the container too — one `KEY=value` per line, `
 no shell expansion. Nothing is mounted and your own `~/.config/gh` is never shared, so the container
 holds no credential beyond what this file carries.
 
+Your git identity travels separately, as `-e` arguments the launcher derives from the host. Docker
+gives `-e` precedence over `--env-file` whatever the argument order, so a `GIT_AUTHOR_NAME` or
+`GIT_AUTHOR_EMAIL` line in this file has no effect.
+
 Verify from inside the container:
 
 ```bash
