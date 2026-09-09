@@ -1,7 +1,7 @@
 ARG BASE_IMAGE=eclipse-temurin:25
 FROM ${BASE_IMAGE}
 
-RUN apt-get update && apt-get install -y curl git docker.io python3 python3-pip python3-venv sudo \
+RUN apt-get update && apt-get install -y curl git docker.io gh python3 python3-pip python3-venv sudo \
     && rm -rf /var/lib/apt/lists/*
 
 RUN id ubuntu >/dev/null 2>&1 \

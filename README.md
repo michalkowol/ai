@@ -54,11 +54,51 @@ The `--model` flag picks the model the agent runs with. Claude Code defaults to
 names (`gpt-5`, `sonnet-4-thinking`, …), so the flag is only forwarded there
 when given explicitly. It is not supported with `--bash`.
 
+## GitHub CLI
+
+`gh` comes from the base image's package repository, so its version follows the base you build
+(`--java` or `--node`) rather than tracking upstream releases.
+
+Give it a **dedicated token** — not your own.
+
+### Create the token
+
+At [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new):
+
+Under **Repository permissions**, leave everything not listed below at *No access*:
+
+| Permission | Value | What it buys |
+| --- | --- | --- |
+| Metadata | Read-only | mandatory, preselected |
+| Contents | Read-only | clone, file reads, `gh pr diff`, `gh pr checkout`. Read-only is what makes GitHub itself refuse pushes and releases |
+| Pull requests | Read and write | `gh pr view/list/diff/checks`, plus comments and reviews — each one still gated by an approval prompt |
+| Issues | Read and write | `gh issue view/list`, plus comments |
+| Actions | Read-only | `gh run list`, `gh run view --log` |
+| Commit statuses | Read-only | `gh pr checks` |
+
+### Hand the token to the container
+
+Keep it in `~/.ai/settings.env` on the host, outside this repo, so it is never committed:
+
+```bash
+mkdir -p ~/.ai
+printf 'GH_TOKEN=github_pat_...\n' > ~/.ai/settings.env
+chmod 600 ~/.ai/settings.env
+```
+
+### What the agent may do
+
+The limits live in `config/claude/managed-settings.json`, mounted read-only at
+`/etc/claude-code/managed-settings.json`: `deny` for destructive commands (`gh repo delete`,
+`gh secret`, `gh api`, `git push`) and `ask` for the ones that write to GitHub (`gh pr comment`,
+`gh issue create`, …). Managed settings outrank every other settings file, so the agent cannot lift
+them; a command in neither list runs unprompted.
+
 ## Layout
 
 ```
 .
-├── Dockerfile         # Configurable base (via --java / --node) + Claude + Cursor + Docker CLI
+├── Dockerfile         # Configurable base (via --java / --node) + Claude + Cursor + Docker CLI + gh
 ├── ai                 # Launcher script
 ├── claude/            # Per-tool config mounted into the container
 ├── cursor/
@@ -67,6 +107,7 @@ when given explicitly. It is not supported with `--bash`.
 │   ├── skills/        # Shared skills
 │   └── rules/         # Shared coding rules
 └── config/
+    └── claude/        # managed-settings.json -> /etc/claude-code/
 ```
 
 ## License
