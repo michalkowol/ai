@@ -65,7 +65,7 @@ Give it a **dedicated token** — not your own.
 
 At [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new):
 
-Under **Repository permissions**
+Under **Repository permissions**, leave everything not listed below at *No access*:
 
 | Permission | Value | What it buys |
 | --- | --- | --- |
@@ -85,6 +85,14 @@ mkdir -p ~/.ai
 printf 'GH_TOKEN=github_pat_...\n' > ~/.ai/settings.env
 chmod 600 ~/.ai/settings.env
 ```
+
+### What the agent may do
+
+The limits live in `config/claude/managed-settings.json`, mounted read-only at
+`/etc/claude-code/managed-settings.json`: `deny` for destructive commands (`gh repo delete`,
+`gh secret`, `gh api`, `git push`) and `ask` for the ones that write to GitHub (`gh pr comment`,
+`gh issue create`, …). Managed settings outrank every other settings file, so the agent cannot lift
+them; a command in neither list runs unprompted.
 
 ## Layout
 
