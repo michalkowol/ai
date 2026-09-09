@@ -56,8 +56,11 @@ when given explicitly. It is not supported with `--bash`.
 
 ## GitHub CLI
 
-`gh` ships in the image. Give it a **dedicated token** — not your own. The token's own scopes are the
-only boundary that still holds if the agent is ever talked around the rules below.
+`gh` comes from the base image's package repository, so its version follows the base you build
+(`--java` or `--node`) rather than tracking upstream releases.
+
+Give it a **dedicated token** — not your own. The token's own scopes are the only boundary that
+still holds if the agent is ever talked around the rules below.
 
 ### Create the token
 
