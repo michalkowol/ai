@@ -1,21 +1,8 @@
 {
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash /opt/ai/hooks/gh-guard.sh",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
-  },
   "permissions": {
     "deny": [
       "Bash(git push:*)",
+      "Bash(gh api:*)",
       "Bash(gh repo delete:*)",
       "Bash(gh repo archive:*)",
       "Bash(gh repo unarchive:*)",

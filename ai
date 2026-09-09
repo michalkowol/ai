@@ -214,7 +214,6 @@ docker run -it --rm \
     "${GIT_ENV[@]}" \
     "${SETTINGS_ENV[@]}" \
     -v "$WORKTREE_DIR:/workspace" \
-    -v "$AI_DIR/common/hooks:/opt/ai/hooks:ro" \
     "${CLAUDE_MOUNTS[@]}" \
     "${CURSOR_MOUNTS[@]}" \
     "${EXTRA_MOUNTS[@]}" \
