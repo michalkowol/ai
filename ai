@@ -121,6 +121,11 @@ if [ -n "$HOST_COMMIT_EMAIL" ]; then
     GIT_ENV+=(-e "GIT_COMMITTER_EMAIL=$HOST_COMMIT_EMAIL")
 fi
 
+ENV_FILE=()
+if [ -f "$HOME/.ai/settings.env" ]; then
+    ENV_FILE+=(--env-file "$HOME/.ai/settings.env")
+fi
+
 EXTRA_MOUNTS=()
 if [ -f "$WORKTREE_DIR/.git" ]; then
     GIT_COMMON_DIR="$(cd "$WORKTREE_DIR" && git rev-parse --git-common-dir 2>/dev/null || true)"
@@ -156,6 +161,7 @@ CLAUDE_MOUNTS=(
     -v "$AI_DIR/common/commands:/home/ubuntu/.claude/commands"
     -v "$AI_DIR/common/skills:/home/ubuntu/.claude/skills"
     -v "$AI_DIR/common/rules:/home/ubuntu/.claude/rules"
+    -v "$AI_DIR/config/claude/managed-settings.json:/etc/claude-code/managed-settings.json:ro"
 )
 
 CURSOR_MOUNTS=(
@@ -164,6 +170,7 @@ CURSOR_MOUNTS=(
     -v "$AI_DIR/common/commands:/home/ubuntu/.cursor/commands"
     -v "$AI_DIR/common/skills:/home/ubuntu/.cursor/skills"
     -v "$AI_DIR/common/rules:/home/ubuntu/.cursor/rules"
+    -v "$AI_DIR/config/cursor/hooks.json:/etc/cursor/hooks.json:ro"
 )
 
 if [ "$TOOL" = "claude" ]; then
@@ -206,7 +213,9 @@ docker run -it --rm \
     -e GRADLE_RO_DEP_CACHE=/home/ubuntu/.gradle-ro/caches \
     -v "$HOME/.m2:/home/ubuntu/.m2" \
     "${GIT_ENV[@]}" \
+    "${ENV_FILE[@]}" \
     -v "$WORKTREE_DIR:/workspace" \
+    -v "$AI_DIR/common/hooks:/opt/ai/hooks:ro" \
     "${CLAUDE_MOUNTS[@]}" \
     "${CURSOR_MOUNTS[@]}" \
     "${EXTRA_MOUNTS[@]}" \
