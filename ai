@@ -170,7 +170,6 @@ CURSOR_MOUNTS=(
     -v "$AI_DIR/common/commands:/home/ubuntu/.cursor/commands"
     -v "$AI_DIR/common/skills:/home/ubuntu/.cursor/skills"
     -v "$AI_DIR/common/rules:/home/ubuntu/.cursor/rules"
-    -v "$AI_DIR/config/cursor/hooks.json:/etc/cursor/hooks.json:ro"
 )
 
 if [ "$TOOL" = "claude" ]; then

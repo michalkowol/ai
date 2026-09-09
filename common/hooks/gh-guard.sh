@@ -2,9 +2,9 @@
 
 set -uf
 
-FORMAT="${1:-claude}"
-
-READ_ONLY="
+# Commands the agent may attempt. Which of them still need approval is decided by
+# permissions.ask in config/claude/managed-settings.json.
+ALLOWED="
 api
 auth status
 browse
@@ -12,24 +12,45 @@ cache list
 config get
 config list
 help
+issue close
+issue comment
+issue create
+issue edit
 issue list
+issue reopen
 issue status
 issue view
+label create
+label edit
 label list
 pr checkout
 pr checks
+pr close
+pr comment
+pr create
 pr diff
+pr edit
 pr list
+pr ready
+pr reopen
+pr review
 pr status
 pr view
+release create
 release download
+release edit
 release list
+release upload
 release view
 repo clone
+repo create
+repo fork
 repo list
 repo view
+run cancel
 run download
 run list
+run rerun
 run view
 run watch
 search code
@@ -40,46 +61,18 @@ search repos
 status
 version
 workflow list
+workflow run
 workflow view
 "
 
-# Keep in sync with permissions.ask in config/claude/managed-settings.json.
-NEEDS_APPROVAL="
-issue close
-issue comment
-issue create
-issue edit
-issue reopen
-label create
-label edit
-pr close
-pr comment
-pr create
-pr edit
-pr ready
-pr reopen
-pr review
-release create
-release edit
-release upload
-repo create
-repo fork
-run cancel
-run rerun
-workflow run
-"
-
 deny() {
-    case "$FORMAT" in
-        cursor) jq -n --arg m "$1" '{permission: "deny", user_message: $m, agent_message: $m}' ;;
-        *) jq -n --arg m "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $m}}' ;;
-    esac
+    jq -n --arg m "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $m}}'
     exit 0
 }
 
 in_list() {
     [ -n "$1" ] || return 1
-    printf '%s' "$2" | grep -qxF -- "$1"
+    printf '%s' "$ALLOWED" | grep -qxF -- "$1"
 }
 
 check_api() {
@@ -123,13 +116,8 @@ check_gh() {
 
     [ "$first" = "api" ] && check_api "$@"
 
-    in_list "$path" "$READ_ONLY" && return 0
-    in_list "$first" "$READ_ONLY" && return 0
-
-    if in_list "$path" "$NEEDS_APPROVAL" || in_list "$first" "$NEEDS_APPROVAL"; then
-        [ "$FORMAT" = "cursor" ] && deny "Blocked: 'gh ${path:-$first}' writes to GitHub and needs a human. Run it yourself."
-        return 0
-    fi
+    in_list "$path" && return 0
+    in_list "$first" && return 0
 
     deny "Blocked: 'gh ${path:-$first}' is not on the agent allowlist. Add it to common/hooks/gh-guard.sh if it should be, or run it yourself."
 }
@@ -147,7 +135,18 @@ check_git() {
 }
 
 payload="$(cat)"
-command="$(jq -r '.tool_input.command // .command // empty' <<<"$payload" 2>/dev/null)"
+
+case "$payload" in
+    *gh*|*git*) ;;
+    *) exit 0 ;;
+esac
+
+if ! command -v jq >/dev/null 2>&1; then
+    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked: gh-guard.sh cannot inspect this command because jq is missing."}}'
+    exit 0
+fi
+
+command="$(jq -r '.tool_input.command // empty' <<<"$payload" 2>/dev/null)"
 [ -n "$command" ] || exit 0
 
 case "$command" in

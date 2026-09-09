@@ -124,27 +124,29 @@ gh auth status
 
 ### What the agent may do
 
-Both agents run without permission prompts (`--dangerously-skip-permissions` / `--force`), so the
-scope is a default-deny allowlist instead:
+Claude Code runs without permission prompts (`--dangerously-skip-permissions`), so the scope is a
+default-deny allowlist instead:
 
-| Command | Claude Code | Cursor Agent |
-| --- | --- | --- |
-| Read-only: `gh pr view`, `gh issue list`, `gh run view`, `gh search …`, `gh api` without write flags | runs | runs |
-| Writes: `gh pr comment`, `gh pr review`, `gh issue create`, `gh release create`, `gh workflow run`, … | asks every time | denied |
-| Everything else: `gh repo delete`, `gh secret`, `gh extension`, `gh api -X POST`, `git push`, unknown subcommands | denied | denied |
+| Command | Result |
+| --- | --- |
+| Reads: `gh pr view`, `gh issue list`, `gh run view`, `gh search …`, `gh api` without write flags | runs |
+| Writes: `gh pr comment`, `gh pr review`, `gh issue create`, `gh release create`, `gh workflow run`, … | asks every time |
+| Everything else: `gh repo delete`, `gh secret`, `gh extension`, `gh api -X POST`, `git push`, unknown subcommands | denied |
 
-- `common/hooks/gh-guard.sh` is the allowlist, wired as a `PreToolUse` hook for Claude Code and a
-  `beforeShellExecution` hook for Cursor Agent. Anything it does not recognize is denied.
+- `common/hooks/gh-guard.sh` holds the allowlist and runs as a `PreToolUse` hook on every Bash call.
+  A `gh` command it does not recognize is denied, as is any `git push`. It defers on everything else,
+  so the permission rules decide. Without `jq` it denies rather than waving commands through.
 - `config/claude/managed-settings.json` mounts read-only at `/etc/claude-code/managed-settings.json`.
   It carries the `ask` rules — the one mechanism that still prompts in bypass mode — plus a `deny`
-  backstop. Managed settings outrank every other settings file, and the mount is read-only, so the
-  agent cannot lift its own restrictions.
-- `config/cursor/hooks.json` mounts read-only at `/etc/cursor/hooks.json`. Cursor honours only `deny`
-  from a hook, so write commands are denied there rather than gated.
+  backstop for the destructive commands. Managed settings outrank every other settings file, and the
+  mount is read-only, so the agent cannot lift its own restrictions.
 
-To widen the scope, add the `<command> <verb>` line to `READ_ONLY` or `NEEDS_APPROVAL` in
-`common/hooks/gh-guard.sh`; for `NEEDS_APPROVAL` also add the matching `Bash(gh …:*)` entry to the
-`ask` list in `config/claude/managed-settings.json`.
+To widen the scope, add the `<command> <verb>` line to `ALLOWED` in `common/hooks/gh-guard.sh`. If it
+writes anything, also add a matching `Bash(gh …:*)` entry to the `ask` list in
+`config/claude/managed-settings.json`, otherwise it will run without a prompt.
+
+None of this covers `ai --cursor`: Cursor Agent runs with `--force` and has no policy here, so the
+token's own scopes are the only limit there.
 
 ### What the token refuses by design
 
@@ -177,8 +179,7 @@ boundary that actually holds.
 │   ├── rules/         # Shared coding rules
 │   └── hooks/         # gh-guard.sh — the GitHub CLI allowlist
 └── config/
-    ├── claude/        # managed-settings.json -> /etc/claude-code/
-    └── cursor/        # hooks.json -> /etc/cursor/
+    └── claude/        # managed-settings.json -> /etc/claude-code/
 ```
 
 ## License

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash /opt/ai/hooks/gh-guard.sh claude",
+            "command": "bash /opt/ai/hooks/gh-guard.sh",
             "timeout": 10
           }
         ]
