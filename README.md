@@ -65,7 +65,7 @@ Give it a **dedicated token** — not your own.
 
 At [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new):
 
-Under **Repository permissions**, set these six and leave everything else at *No access*:
+Under **Repository permissions**
 
 | Permission | Value | What it buys |
 | --- | --- | --- |
