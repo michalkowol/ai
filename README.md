@@ -63,18 +63,16 @@ Give it a **dedicated token** — not your own.
 
 ### Create the token
 
-At [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new):
+Use a **classic** token, not fine-grained. A fine-grained token is scoped to a single resource
+owner, so it cannot span more than one organization.
 
-Under **Repository permissions**, leave everything not listed below at *No access*:
+At [github.com/settings/tokens/new](https://github.com/settings/tokens/new?scopes=repo,read:org&description=ai-container)
+— that link preselects both scopes below.
 
-| Permission | Value | What it buys |
-| --- | --- | --- |
-| Metadata | Read-only | mandatory, preselected |
-| Contents | Read-only | clone, file reads, `gh pr diff`, `gh pr checkout`. Read-only is what makes GitHub itself refuse pushes and releases |
-| Pull requests | Read and write | `gh pr view/list/diff/checks`, plus comments and reviews — each one still gated by an approval prompt |
-| Issues | Read and write | `gh issue view/list`, plus comments |
-| Actions | Read-only | `gh run list`, `gh run view --log` |
-| Commit statuses | Read-only | `gh pr checks` |
+| Scope | What it buys |
+| --- | --- |
+| `repo` | the only way to reach pull requests and issues in private repos — classic tokens have no narrower pull-request scope. Tick the parent box; the children come with it |
+| `read:org` | resolves org and team membership. Needed because a review request often targets a **team** rather than you personally, and those PRs are invisible without it |
 
 ### Hand the token to the container
 
@@ -82,17 +80,9 @@ Keep it in `~/.ai/settings.env` on the host, outside this repo, so it is never c
 
 ```bash
 mkdir -p ~/.ai
-printf 'GH_TOKEN=github_pat_...\n' > ~/.ai/settings.env
+printf 'GH_TOKEN=ghp_...\n' > ~/.ai/settings.env
 chmod 600 ~/.ai/settings.env
 ```
-
-### What the agent may do
-
-The limits live in `config/claude/managed-settings.json`, mounted read-only at
-`/etc/claude-code/managed-settings.json`: `deny` for destructive commands (`gh repo delete`,
-`gh secret`, `gh api`, `git push`) and `ask` for the ones that write to GitHub (`gh pr comment`,
-`gh issue create`, …). Managed settings outrank every other settings file, so the agent cannot lift
-them; a command in neither list runs unprompted.
 
 ## Layout
 
