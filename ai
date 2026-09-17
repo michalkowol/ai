@@ -9,8 +9,10 @@ IMAGE_VERSION="21"
 MODEL=""
 RESUME=""
 UPDATE=""
+DASHBOARD="1"
+DASHBOARD_PORT="${AI_DASHBOARD_PORT:-8787}"
 
-USAGE="Usage: ai [--claude|--cursor|--bash] [--java <version>|--node <version>] [--model <model>] [--resume <session-id>] [--update] [path]"
+USAGE="Usage: ai [--claude|--cursor|--bash] [--java <version>|--node <version>] [--model <model>] [--resume <session-id>] [--update] [--without-dashboard] [path]"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -80,6 +82,10 @@ while [ $# -gt 0 ]; do
             ;;
         --update)
             UPDATE="1"
+            shift
+            ;;
+        --without-dashboard)
+            DASHBOARD=""
             shift
             ;;
         --*)
@@ -155,6 +161,52 @@ else
     docker build -q -t "$IMAGE_TAG" --build-arg "BASE_IMAGE=${BASE_IMAGE}" . > /dev/null
 fi
 
+RUNS_DIR="$AI_DIR/claude/.claude/ai-runs"
+mkdir -p "$RUNS_DIR"
+
+prune_runs() {
+    local live run_dir run_id
+    live="$(docker ps --filter label=ai.run --format '{{.Label "ai.run"}}' 2>/dev/null || true)"
+    for run_dir in "$RUNS_DIR"/*/; do
+        [ -d "$run_dir" ] || continue
+        run_id="$(basename "$run_dir")"
+        if printf '%s\n' "$live" | grep -qx "$run_id"; then
+            continue
+        fi
+        if [ -n "$(find "$run_dir" -maxdepth 0 -mmin +2)" ]; then
+            rm -rf "$run_dir"
+        fi
+    done
+}
+
+# A running container keeps serving from the directory it was started with, even after that
+# directory is replaced (branch switch) or removed (worktree removal), so check it still works.
+dashboard_is_current() {
+    local mounted
+    mounted="$(docker inspect ai-dashboard \
+        --format '{{range .Mounts}}{{if eq .Destination "/dashboard"}}{{.Source}}{{end}}{{end}}' 2>/dev/null || true)"
+    [ "$mounted" = "$AI_DIR/dashboard" ] || return 1
+    curl -fs -o /dev/null --max-time 2 "http://127.0.0.1:${DASHBOARD_PORT}/"
+}
+
+ensure_dashboard() {
+    if [ -z "$(docker ps -q --filter "name=^ai-dashboard$")" ] || ! dashboard_is_current; then
+        docker rm -f ai-dashboard >/dev/null 2>&1 || true
+        docker run -d --init --name ai-dashboard \
+            -p "127.0.0.1:${DASHBOARD_PORT}:8787" \
+            -v "$AI_DIR/claude/.claude:/home/ubuntu/.claude:ro" \
+            -v "$AI_DIR/dashboard:/dashboard:ro" \
+            "$IMAGE_TAG" python3 /dashboard/server.py --host 0.0.0.0 --port 8787 >/dev/null \
+            || { echo "Warning: dashboard failed to start" >&2; return; }
+    fi
+    echo "Dashboard: http://localhost:${DASHBOARD_PORT}"
+}
+
+prune_runs
+if [ -n "$DASHBOARD" ]; then
+    ensure_dashboard
+fi
+
 CLAUDE_MOUNTS=(
     -v "$AI_DIR/claude/.claude:/home/ubuntu/.claude"
     -v "$AI_DIR/claude/.claude.json:/home/ubuntu/.claude.json"
@@ -204,7 +256,24 @@ fi
 
 DOCKER_SOCK_GID=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$IMAGE_TAG" stat -c '%g' /var/run/docker.sock)
 
+RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
+RUN_DIR="$RUNS_DIR/$RUN_ID"
+mkdir -p -m 700 "$RUN_DIR/sessions"
+printf 'worktree=%s\ntool=%s\nmodel=%s\nresume=%s\nstartedAt=%s\n' \
+    "$WORKTREE_DIR" "$TOOL" "$MODEL" "$RESUME" "$(date +%s)" > "$RUN_DIR/run.env"
+
+# The container outlives this script when the terminal is closed, so only remove the run dir once it is gone.
+cleanup() {
+    if [ -z "$(docker ps -q --filter "label=ai.run=$RUN_ID" 2>/dev/null)" ]; then
+        rm -rf "$RUN_DIR"
+    fi
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 143' TERM
+
 docker run -it --rm \
+    --label "ai.run=$RUN_ID" \
     -v /var/run/docker.sock:/var/run/docker.sock \
     --group-add "$DOCKER_SOCK_GID" \
     --add-host=host.docker.internal:host-gateway \
@@ -215,6 +284,7 @@ docker run -it --rm \
     "${SETTINGS_ENV[@]}" \
     -v "$WORKTREE_DIR:/workspace" \
     "${CLAUDE_MOUNTS[@]}" \
+    -v "$RUN_DIR/sessions:/home/ubuntu/.claude/sessions" \
     "${CURSOR_MOUNTS[@]}" \
     "${EXTRA_MOUNTS[@]}" \
     "$IMAGE_TAG" "${CMD[@]}"
