@@ -30,14 +30,15 @@ ln -s "$(pwd)/ai" ~/.local/bin/ai
 ## Usage
 
 ```bash
-ai                   # Claude Code (default), current directory
-ai --claude path/    # Claude Code in a specific directory
-ai --cursor path/    # Cursor Agent
-ai --bash path/      # Plain bash shell in the container
-ai --java 21         # Build the Java image with a specific version (default: 25)
-ai --node jod        # Build the Node.js image with a specific tag
-ai --model sonnet    # Pick the model (default: opus)
-ai --java 21 path/   # Combine with any tool/path
+ai                      # Claude Code (default), current directory
+ai --claude path/       # Claude Code in a specific directory
+ai --cursor path/       # Cursor Agent
+ai --bash path/         # Plain bash shell in the container
+ai --java 21            # Build the Java image with a specific version (default: 25)
+ai --node jod           # Build the Node.js image with a specific tag
+ai --model sonnet       # Pick the model (default: opus)
+ai --without-dashboard  # Do not start the sessions dashboard
+ai --java 21 path/      # Combine with any tool/path
 ```
 
 The given path is mounted as `/workspace` inside the container. Git worktrees
@@ -53,6 +54,20 @@ The `--model` flag picks the model the agent runs with. Claude Code defaults to
 `opus`; pass e.g. `--model sonnet` to override. Cursor Agent uses its own model
 names (`gpt-5`, `sonnet-4-thinking`, …), so the flag is only forwarded there
 when given explicitly. It is not supported with `--bash`.
+
+## Dashboard
+
+Every `ai` run starts a single `ai-dashboard` container serving
+http://localhost:8787: live and recently ended Claude Code sessions, what each
+one is doing right now and which ones wait for input. It refreshes every 10 s.
+Click **Enable notifications** to get a browser notification when a session
+needs input or finishes a turn.
+
+- the theme follows the operating system, the **Dark mode** / **Light mode** button overrides it
+- `ai --without-dashboard` skips it, `AI_DASHBOARD_PORT=9000 ai` changes the port
+- `docker restart ai-dashboard` after editing `dashboard/`, `docker rm -f ai-dashboard` stops it
+- each container gets a private session registry in `claude/.claude/ai-runs/<run-id>/`,
+  removed when the container exits
 
 ## GitHub CLI
 
@@ -90,6 +105,7 @@ chmod 600 ~/.ai/settings.env
 .
 ├── Dockerfile         # Configurable base (via --java / --node) + Claude + Cursor + Docker CLI + gh
 ├── ai                 # Launcher script
+├── dashboard/         # Sessions dashboard: server.py + index.html, run as the ai-dashboard container
 ├── claude/            # Per-tool config mounted into the container
 ├── cursor/
 ├── common/

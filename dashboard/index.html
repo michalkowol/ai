@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude sessions</title>
+  <style>
+    :root {
+      --ivory:    #FAF9F5;
+      --slate:    #141413;
+      --clay:     #D97757;
+      --oat:      #E3DACC;
+      --olive:    #788C5D;
+      --gray-150: #F0EEE6;
+      --gray-300: #D1CFC5;
+      --gray-500: #87867F;
+      --gray-700: #3D3D3A;
+      --white:    #FFFFFF;
+
+      --serif: ui-serif, Georgia, 'Times New Roman', serif;
+      --sans:  system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --mono:  ui-monospace, 'SF Mono', Menlo, Monaco, monospace;
+
+      color-scheme: light;
+    }
+
+    :root[data-theme="dark"] {
+      --ivory:    #1A1A18;  /* page background, and text on clay/olive/slate */
+      --slate:    #F5F4EE;  /* headings and emphasis, so light here */
+      --clay:     #D97757;
+      --oat:      #4A4437;
+      --olive:    #7E9264;
+      --gray-150: #2C2C28;
+      --gray-300: #3B3B35;
+      --gray-500: #9C9B92;
+      --gray-700: #D6D4CB;
+      --white:    #22221F;  /* card and tile surfaces */
+
+      color-scheme: dark;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--ivory);
+      color: var(--gray-700);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.92em;
+      background: var(--gray-150);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    h1, h2, h3 {
+      font-family: var(--serif);
+      font-weight: 500;
+      color: var(--slate);
+      letter-spacing: -0.01em;
+    }
+
+    h1 { font-size: 38px; line-height: 1.15; }
+    h2 { font-size: 24px; line-height: 1.2; }
+    h3 { font-size: 18px; line-height: 1.3; }
+
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--gray-500);
+    }
+
+    .pill {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      background: var(--gray-150);
+      border: 1.5px solid var(--gray-300);
+      color: var(--gray-700);
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .pill.waiting { background: var(--clay); border-color: var(--clay); color: var(--ivory); }
+    .pill.busy    { background: var(--olive); border-color: var(--olive); color: var(--ivory); }
+    .pill.shell   { background: var(--oat); border-color: var(--oat); color: var(--slate); }
+
+    .tag {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 11px;
+      background: var(--oat);
+      color: var(--slate);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    button.btn {
+      font-family: var(--sans);
+      font-size: 14px;
+      padding: 9px 16px;
+      border-radius: 10px;
+      border: 1.5px solid var(--gray-300);
+      background: var(--white);
+      color: var(--slate);
+      cursor: pointer;
+    }
+
+    button.btn.primary {
+      background: var(--slate);
+      border-color: var(--slate);
+      color: var(--ivory);
+    }
+
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 48px 32px 96px; }
+
+    .top { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: 28px; }
+    .controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 14px; }
+    .controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .hint { font-size: 13px; color: var(--gray-500); }
+
+    .banner {
+      background: var(--clay);
+      color: var(--ivory);
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 32px; }
+    .kpi { background: var(--white); border: 1.5px solid var(--gray-300); border-radius: 12px; padding: 14px 18px; }
+    .kpi .value { font-size: 28px; font-weight: 600; color: var(--slate); line-height: 1.2; }
+    .kpi.accent .value { color: var(--clay); }
+    .kpi .label { font-size: 13px; color: var(--gray-500); margin-top: 2px; }
+
+    .card {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr) 220px;
+      gap: 20px;
+      background: var(--white);
+      border: 1.5px solid var(--gray-300);
+      border-left: 5px solid var(--gray-300);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+    .card.waiting { border-left-color: var(--clay); }
+    .card.busy    { border-left-color: var(--olive); }
+    .card.shell   { border-left-color: var(--oat); }
+
+    .card .title { margin: 10px 0 6px; overflow-wrap: anywhere; }
+    .card .meta { font-family: var(--mono); font-size: 12px; color: var(--gray-500); overflow-wrap: anywhere; }
+    .card .since { font-size: 12.5px; color: var(--gray-500); margin-left: 8px; }
+    .card .plan { margin-left: 6px; }
+
+    .field { margin-bottom: 10px; font-size: 14px; overflow-wrap: anywhere; }
+    .field .eyebrow { display: block; margin-bottom: 2px; }
+    .field.now { color: var(--slate); }
+    .tool { font-family: var(--mono); font-size: 12.5px; }
+    .tool .tag { margin-right: 4px; }
+
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; align-content: start; }
+    .stats strong { display: block; font-size: 15px; font-weight: 600; color: var(--slate); }
+    .stats span { font-size: 12px; color: var(--gray-500); }
+
+    .ended h2 { margin: 40px 0 14px; }
+    .row {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 80px 80px 130px;
+      gap: 14px;
+      align-items: baseline;
+      padding: 10px 0;
+      border-bottom: 1.5px solid var(--gray-300);
+      font-size: 14px;
+    }
+    .row .mono { font-family: var(--mono); font-size: 12.5px; color: var(--gray-500); overflow-wrap: anywhere; }
+    .row .num { font-variant-numeric: tabular-nums; text-align: right; }
+
+    .empty { color: var(--gray-500); padding: 24px 0; }
+    .foot { margin-top: 28px; font-size: 13px; color: var(--gray-500); }
+
+    @media (max-width: 860px) {
+      .card { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(3, 1fr); }
+      .row { grid-template-columns: 1fr 1fr; }
+      .row .num { text-align: left; }
+    }
+  </style>
+  <script>
+    (() => {
+      let stored = null;
+      try { stored = JSON.parse(localStorage.getItem('theme')); } catch (error) {}
+      const dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    })();
+  </script>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div>
+        <div class="eyebrow" style="margin-bottom: 10px;">Claude Code · refreshes every 10 s · <span id="updated">connecting</span></div>
+        <h1>Sessions</h1>
+      </div>
+      <div class="controls">
+        <label><input type="checkbox" id="notifyIdle"> Notify when a turn finishes</label>
+        <button class="btn primary" id="notifyBtn" hidden>Enable notifications</button>
+        <span class="pill" id="notifyOn" hidden>notifications on</span>
+        <span class="hint" id="notifyDenied" hidden>Notifications are blocked for this site in the browser settings</span>
+        <button class="btn" id="themeBtn"></button>
+      </div>
+    </header>
+
+    <div class="banner" id="banner" hidden>Connection to the dashboard server lost, retrying every 10 s</div>
+
+    <section class="kpis" id="kpis"></section>
+    <section id="live"></section>
+    <section class="ended" id="ended"></section>
+    <footer class="foot" id="foot"></footer>
+  </div>
+
+  <script>
+    (() => {
+      const POLL_MS = 10000;
+      const FETCH_TIMEOUT_MS = 8000;
+      const STATUS_LABEL = { waiting: 'Needs input', busy: 'Working', idle: 'Waiting for prompt', shell: 'In shell', ended: 'Ended' };
+
+      const el = id => document.getElementById(id);
+      const load = (key, fallback) => {
+        try {
+          const value = localStorage.getItem(key);
+          return value === null ? fallback : JSON.parse(value);
+        } catch (error) {
+          return fallback;
+        }
+      };
+      const save = (key, value) => {
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch (error) {}
+      };
+
+      const state = { firstPoll: true, inFlight: false, timer: null, notified: load('notified', {}) };
+
+      const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      const basename = path => path ? path.replace(/\/+$/, '').split('/').pop() : '';
+      const truncate = (text, max) => {
+        text = String(text ?? '');
+        return text.length > max ? text.slice(0, max - 1) + '…' : text;
+      };
+
+      function fmtDuration(ms) {
+        if (ms == null || Number.isNaN(ms) || ms < 0) return '–';
+        const s = Math.round(ms / 1000);
+        if (s < 60) return s + ' s';
+        const m = Math.floor(s / 60);
+        if (m < 60) return m + ' min';
+        const h = Math.floor(m / 60);
+        if (h < 24) return h + ' h ' + (m % 60) + ' min';
+        return Math.floor(h / 24) + ' d ' + (h % 24) + ' h';
+      }
+      const fmtAgo = (ms, now) => ms ? fmtDuration(now - ms) + ' ago' : '–';
+      const fmtTime = ms => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const fmtCost = usd => usd == null ? '–' : '$' + usd.toFixed(2);
+      const fmtSince = ms => ms >= 3600000 ? Math.round(ms / 3600000) + ' h' : Math.round(ms / 60000) + ' min';
+
+      function newestPending(session) {
+        const pending = (session.transcript || {}).pendingTools || [];
+        return pending.length ? pending[pending.length - 1] : null;
+      }
+
+      function nowText(session) {
+        const transcript = session.transcript || {};
+        const tool = newestPending(session);
+        const toolText = tool ? tool.name + ' · ' + tool.summary : '';
+        switch (session.status) {
+          case 'waiting': return [session.needs || session.waitingFor || 'input needed', toolText].filter(Boolean).join(' · ');
+          case 'busy': return toolText || 'Thinking';
+          case 'idle': return transcript.lastAssistantText || 'Waiting for your next prompt';
+          case 'shell': return 'Shell escape open in the terminal';
+          default: return transcript.lastAssistantText || '';
+        }
+      }
+
+      function tile(label, value, accent) {
+        return `<div class="kpi${accent ? ' accent' : ''}"><div class="value">${value}</div><div class="label">${esc(label)}</div></div>`;
+      }
+
+      function card(session, now) {
+        const transcript = session.transcript || {};
+        const run = session.run || {};
+        const subagents = (transcript.pendingTools || []).filter(tool => tool.name === 'Agent').length;
+        const meta = [
+          transcript.branch,
+          basename(run.worktree),
+          transcript.model || run.model,
+          session.startedAt ? 'started ' + fmtTime(session.startedAt) : null,
+          session.sessionId.slice(0, 8)
+        ].filter(Boolean).join(' · ');
+        const recent = (transcript.recentTools || []).slice().reverse()
+          .map(tool => `<div class="tool"><span class="tag">${esc(tool.name)}</span>${esc(truncate(tool.summary, 70))}</div>`).join('');
+        return `
+          <article class="card ${esc(session.status)}">
+            <div>
+              <span class="pill ${esc(session.status)}">${esc(STATUS_LABEL[session.status] || session.status)}</span>
+              ${session.statusUpdatedAt ? `<span class="since">for ${fmtDuration(now - session.statusUpdatedAt)}</span>` : ''}
+              ${transcript.permissionMode === 'plan' ? '<span class="tag plan">plan</span>' : ''}
+              <h3 class="title">${esc(session.title)}</h3>
+              <div class="meta">${esc(meta)}</div>
+            </div>
+            <div>
+              <div class="field now"><span class="eyebrow">Now</span>${esc(truncate(nowText(session), 220))}</div>
+              ${transcript.lastPrompt ? `<div class="field"><span class="eyebrow">Last prompt</span>${esc(truncate(transcript.lastPrompt, 180))}</div>` : ''}
+              ${recent ? `<div class="field"><span class="eyebrow">Recent tools</span>${recent}</div>` : ''}
+            </div>
+            <div class="stats">
+              <div><strong>${session.startedAt ? fmtDuration(now - session.startedAt) : '–'}</strong><span>elapsed</span></div>
+              <div><strong>${transcript.turns ?? '–'}</strong><span>turns</span></div>
+              <div><strong>${transcript.lastTurnDurationMs != null ? fmtDuration(transcript.lastTurnDurationMs) : '–'}</strong><span>last turn</span></div>
+              <div><strong>${subagents}</strong><span>subagents running</span></div>
+              <div><strong>${fmtAgo(session.lastActivityAt, now)}</strong><span>last activity</span></div>
+            </div>
+          </article>`;
+      }
+
+      function row(session, now) {
+        const transcript = session.transcript || {};
+        return `
+          <div class="row">
+            <div>${esc(session.title)}</div>
+            <div class="mono">${esc([transcript.branch, transcript.model].filter(Boolean).join(' · '))}</div>
+            <div class="num">${transcript.turns ?? '–'} turns</div>
+            <div class="num">${fmtCost((transcript.cost || {}).usd)}</div>
+            <div class="mono">${esc(fmtAgo(session.lastActivityAt, now))}</div>
+          </div>`;
+      }
+
+      function render(data) {
+        const now = data.now;
+        const live = data.sessions.filter(session => session.live);
+        const ended = data.sessions.filter(session => !session.live);
+        const count = status => live.filter(session => session.status === status).length;
+        const waiting = count('waiting');
+        el('kpis').innerHTML =
+          tile('Needs input', waiting, waiting > 0) +
+          tile('Working', count('busy'), false) +
+          tile('Waiting for prompt', count('idle') + count('shell'), false) +
+          tile('Ended in the last ' + fmtSince(data.sinceMs), ended.length, false);
+        el('live').innerHTML = live.length
+          ? live.map(session => card(session, now)).join('')
+          : '<p class="empty">No live Claude sessions. Start one with <code>ai</code>.</p>';
+        el('ended').innerHTML = ended.length ? '<h2>Ended recently</h2>' + ended.map(session => row(session, now)).join('') : '';
+        el('foot').textContent = data.runsWithoutSession ? data.runsWithoutSession + ' container(s) running without a Claude session' : '';
+        el('updated').textContent = 'updated ' + new Date(now).toLocaleTimeString();
+        document.title = (waiting ? '(' + waiting + ') ' : '') + 'Claude sessions';
+      }
+
+      const canNotify = () => 'Notification' in window && Notification.permission === 'granted';
+
+      function show(title, body, tag) {
+        const notification = new Notification(title, { body, tag });
+        notification.onclick = () => { window.focus(); notification.close(); };
+      }
+
+      function notify(data) {
+        const notified = {};
+        for (const session of data.sessions) {
+          if (!session.live) continue;
+          const known = Boolean(state.notified[session.sessionId]);
+          const previous = state.notified[session.sessionId] || {};
+          const current = { waiting: previous.waiting, idle: previous.idle };
+          if (session.status === 'waiting' && session.statusUpdatedAt && previous.waiting !== session.statusUpdatedAt) {
+            current.waiting = session.statusUpdatedAt;
+            if (canNotify()) show('Needs input · ' + session.title, truncate(nowText(session), 160), session.sessionId);
+          }
+          if (session.status === 'idle' && session.statusUpdatedAt && previous.idle !== session.statusUpdatedAt) {
+            current.idle = session.statusUpdatedAt;
+            if (canNotify() && known && !state.firstPoll && el('notifyIdle').checked) show('Finished · ' + session.title, truncate(nowText(session), 160), session.sessionId);
+          }
+          notified[session.sessionId] = current;
+        }
+        state.notified = notified;
+        save('notified', notified);
+      }
+
+      async function poll() {
+        if (state.inFlight) return;
+        state.inFlight = true;
+        clearTimeout(state.timer);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        try {
+          const response = await fetch('/api/sessions', { signal: controller.signal, cache: 'no-store' });
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          const data = await response.json();
+          render(data);
+          notify(data);
+          state.firstPoll = false;
+          el('banner').hidden = true;
+        } catch (error) {
+          el('banner').hidden = false;
+        } finally {
+          clearTimeout(timeout);
+          state.inFlight = false;
+          state.timer = setTimeout(poll, POLL_MS);
+        }
+      }
+
+      function syncNotifyUi() {
+        const supported = 'Notification' in window;
+        el('notifyBtn').hidden = !supported || Notification.permission !== 'default';
+        el('notifyOn').hidden = !supported || Notification.permission !== 'granted';
+        el('notifyDenied').hidden = !supported || Notification.permission !== 'denied';
+      }
+
+      function setTheme(theme) {
+        document.documentElement.dataset.theme = theme;
+        el('themeBtn').textContent = theme === 'dark' ? 'Light mode' : 'Dark mode';
+      }
+
+      el('themeBtn').addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        save('theme', theme);
+        setTheme(theme);
+      });
+      matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+        if (!load('theme', null)) {
+          setTheme(event.matches ? 'dark' : 'light');
+        }
+      });
+
+      el('notifyBtn').addEventListener('click', async () => {
+        try { await Notification.requestPermission(); } catch (error) {}
+        syncNotifyUi();
+      });
+      el('notifyIdle').checked = load('notifyIdle', true);
+      el('notifyIdle').addEventListener('change', event => save('notifyIdle', event.target.checked));
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') poll();
+      });
+
+      setTheme(document.documentElement.dataset.theme);
+      syncNotifyUi();
+      poll();
+    })();
+  </script>
+</body>
+</html>
