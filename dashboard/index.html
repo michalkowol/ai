@@ -202,6 +202,45 @@
     .empty { color: var(--gray-500); padding: 24px 0; }
     .foot { margin-top: 28px; font-size: 13px; color: var(--gray-500); }
 
+    :root[data-compact="on"] .card {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: baseline;
+      gap: 4px 14px;
+      padding: 9px 14px;
+      margin-bottom: 6px;
+    }
+    :root[data-compact="on"] .card > :first-child {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 3px 8px;
+      min-width: 0;
+    }
+    :root[data-compact="on"] .card > :nth-child(2) { grid-column: 1 / -1; }
+    :root[data-compact="on"] .card h3 { font-size: 15px; }
+    :root[data-compact="on"] .card .since,
+    :root[data-compact="on"] .card .plan { margin-left: 0; }
+    :root[data-compact="on"] .card .hash { display: none; }
+    :root[data-compact="on"] .card .title,
+    :root[data-compact="on"] .card .meta,
+    :root[data-compact="on"] .field.now {
+      margin: 0;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    :root[data-compact="on"] .card .meta { flex: 1 1 auto; font-size: 11.5px; }
+    :root[data-compact="on"] .field:not(.now) { display: none; }
+    :root[data-compact="on"] .field .eyebrow { display: inline; margin: 0 6px 0 0; }
+    :root[data-compact="on"] .stats { display: flex; justify-content: flex-end; gap: 12px; }
+    :root[data-compact="on"] .stats > div { display: none; }
+    :root[data-compact="on"] .stats > div:first-child,
+    :root[data-compact="on"] .stats > div.cost,
+    :root[data-compact="on"] .stats > div.tokens { display: block; }
+    :root[data-compact="on"] .stats strong { display: inline; font-size: 12.5px; font-weight: 500; }
+    :root[data-compact="on"] .stats span { display: inline; margin-left: 5px; }
+
     @media (max-width: 860px) {
       .card { grid-template-columns: 1fr; }
       .stats { grid-template-columns: repeat(3, 1fr); }
@@ -215,6 +254,9 @@
       try { stored = JSON.parse(localStorage.getItem('theme')); } catch (error) {}
       const dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      try {
+        if (JSON.parse(localStorage.getItem('compact'))) document.documentElement.dataset.compact = 'on';
+      } catch (error) {}
     })();
   </script>
 </head>
@@ -231,6 +273,7 @@
         <span class="pill" id="notifyOn" hidden>notifications on</span>
         <span class="hint" id="notifyDenied" hidden>Notifications are blocked for this site in the browser settings</span>
         <button class="btn" id="themeBtn"></button>
+        <button class="btn" id="compactBtn"></button>
       </div>
     </header>
 
@@ -248,6 +291,7 @@
       const FETCH_TIMEOUT_MS = 8000;
       const PULSE_MS = 2000;  // duration of the `attention` keyframes; a re-rendered card resumes mid-cycle
       const STATUS_LABEL = { waiting: 'Needs input', busy: 'Working', idle: 'Waiting for prompt', shell: 'In shell', ended: 'Ended' };
+      const ESTIMATE_NOTE = 'Estimated from the token usage in the transcript, subagent calls are not counted';
 
       const el = id => document.getElementById(id);
       const load = (key, fallback) => {
@@ -284,7 +328,28 @@
       const fmtAgo = (ms, now) => ms ? fmtDuration(now - ms) + ' ago' : '–';
       const fmtTime = ms => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const fmtCost = usd => usd == null ? '–' : '$' + usd.toFixed(2);
+      function fmtTokens(count) {
+        if (count == null) return '–';
+        if (count < 1000) return String(count);
+        const [value, unit] = count < 1000000 ? [count / 1000, 'k'] : [count / 1000000, 'M'];
+        return (value < 10 ? value.toFixed(1) : Math.round(value)) + unit;
+      }
       const fmtSince = ms => ms >= 3600000 ? Math.round(ms / 3600000) + ' h' : Math.round(ms / 60000) + ' min';
+
+      // Claude Code writes its own cost only at exit and at a context compaction, so a live session gets the
+      // higher of that checkpoint and the tokens seen so far: both are lower bounds of what it has spent.
+      function usageInfo(session) {
+        const transcript = session.transcript || {};
+        const reported = (transcript.cost || {}).usd;
+        const estimate = transcript.estimatedCostUSD;
+        const estimated = session.live && estimate != null;
+        return {
+          cost: estimated ? '~' + fmtCost(Math.max(estimate, reported ?? 0)) : fmtCost(reported),
+          costTitle: estimated ? ESTIMATE_NOTE : '',
+          tokens: transcript.estimatedTokens == null ? '–' : '~' + fmtTokens(transcript.estimatedTokens),
+          tokensTitle: ESTIMATE_NOTE
+        };
+      }
 
       const ackKey = session => session.statusUpdatedAt || 0;
 
@@ -312,14 +377,15 @@
 
       function card(session, now) {
         const transcript = session.transcript || {};
+        const spend = usageInfo(session);
         const run = session.run || {};
         const subagents = (transcript.pendingTools || []).filter(tool => tool.name === 'Agent').length;
         const meta = [
           transcript.branch,
           basename(run.worktree),
           transcript.model || run.model,
-          session.startedAt ? 'started ' + fmtTime(session.startedAt) : null,
-          session.sessionId.slice(0, 8)
+          transcript.effort,
+          session.startedAt ? 'started ' + fmtTime(session.startedAt) : null
         ].filter(Boolean).join(' · ');
         const recent = (transcript.recentTools || []).slice().reverse()
           .map(tool => `<div class="tool"><span class="tag">${esc(tool.name)}</span>${esc(truncate(tool.summary, 70))}</div>`).join('');
@@ -331,7 +397,7 @@
               ${session.statusUpdatedAt ? `<span class="since">for ${fmtDuration(now - session.statusUpdatedAt)}</span>` : ''}
               ${transcript.permissionMode === 'plan' ? '<span class="tag plan">plan</span>' : ''}
               <h3 class="title">${esc(session.title)}</h3>
-              <div class="meta">${esc(meta)}</div>
+              <div class="meta">${esc(meta)}<span class="hash"> · ${esc(session.sessionId.slice(0, 8))}</span></div>
             </div>
             <div>
               <div class="field now"><span class="eyebrow">Now</span>${esc(truncate(nowText(session), 220))}</div>
@@ -344,6 +410,8 @@
               <div><strong>${transcript.lastTurnDurationMs != null ? fmtDuration(transcript.lastTurnDurationMs) : '–'}</strong><span>last turn</span></div>
               <div><strong>${subagents}</strong><span>subagents running</span></div>
               <div><strong>${fmtAgo(session.lastActivityAt, now)}</strong><span>last activity</span></div>
+              <div class="cost"${spend.costTitle ? ` title="${esc(spend.costTitle)}"` : ''}><strong>${esc(spend.cost)}</strong><span>cost</span></div>
+              <div class="tokens" title="${esc(spend.tokensTitle)}"><strong>${esc(spend.tokens)}</strong><span>tokens</span></div>
             </div>
           </article>`;
       }
@@ -449,6 +517,21 @@
         el('themeBtn').textContent = theme === 'dark' ? 'Light mode' : 'Dark mode';
       }
 
+      function setCompact(compact) {
+        if (compact) {
+          document.documentElement.dataset.compact = 'on';
+        } else {
+          delete document.documentElement.dataset.compact;
+        }
+        el('compactBtn').textContent = compact ? 'Full view' : 'Compact view';
+      }
+
+      el('compactBtn').addEventListener('click', () => {
+        const compact = document.documentElement.dataset.compact !== 'on';
+        save('compact', compact);
+        setCompact(compact);
+      });
+
       el('themeBtn').addEventListener('click', () => {
         const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
         save('theme', theme);
@@ -478,6 +561,7 @@
       });
 
       setTheme(document.documentElement.dataset.theme);
+      setCompact(document.documentElement.dataset.compact === 'on');
       syncNotifyUi();
       poll();
 
