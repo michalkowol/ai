@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FAF9F5">
   <title>Claude sessions</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
   <style>
     :root {
       --ivory:    #FAF9F5;
@@ -89,6 +92,7 @@
     .pill.waiting { background: var(--clay); border-color: var(--clay); color: var(--ivory); }
     .pill.busy    { background: var(--olive); border-color: var(--olive); color: var(--ivory); }
     .pill.shell   { background: var(--oat); border-color: var(--oat); color: var(--slate); }
+    .pill.idle    { background: transparent; border-color: var(--clay); color: var(--clay); }
 
     .tag {
       display: inline-block;
@@ -150,9 +154,22 @@
       padding: 18px 20px;
       margin-bottom: 14px;
     }
-    .card.waiting { border-left-color: var(--clay); }
+    .card.waiting { border-left-color: var(--clay); animation: attention 2s ease-in-out infinite; }
     .card.busy    { border-left-color: var(--olive); }
     .card.shell   { border-left-color: var(--oat); }
+    .card.idle    { border-left-color: var(--clay); animation: attention 2s ease-in-out infinite; }
+
+    @keyframes attention {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 87, 0); }
+      50%      { box-shadow: 0 0 0 5px rgba(217, 119, 87, 0.45); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .card.waiting, .card.idle { animation: none; box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.35); }
+    }
+
+    .card.waiting, .card.idle { cursor: pointer; }
+    .card.acked { animation: none; box-shadow: none; }
 
     .card .title { margin: 10px 0 6px; overflow-wrap: anywhere; }
     .card .meta { font-family: var(--mono); font-size: 12px; color: var(--gray-500); overflow-wrap: anywhere; }
@@ -205,7 +222,7 @@
   <div class="wrap">
     <header class="top">
       <div>
-        <div class="eyebrow" style="margin-bottom: 10px;">Claude Code · refreshes every 10 s · <span id="updated">connecting</span></div>
+        <div class="eyebrow" style="margin-bottom: 10px;">Claude Code · refreshes every 3 s · <span id="updated">connecting</span></div>
         <h1>Sessions</h1>
       </div>
       <div class="controls">
@@ -217,7 +234,7 @@
       </div>
     </header>
 
-    <div class="banner" id="banner" hidden>Connection to the dashboard server lost, retrying every 10 s</div>
+    <div class="banner" id="banner" hidden>Connection to the dashboard server lost, retrying every 3 s</div>
 
     <section class="kpis" id="kpis"></section>
     <section id="live"></section>
@@ -227,8 +244,9 @@
 
   <script>
     (() => {
-      const POLL_MS = 10000;
+      const POLL_MS = 3000;
       const FETCH_TIMEOUT_MS = 8000;
+      const PULSE_MS = 2000;  // duration of the `attention` keyframes; a re-rendered card resumes mid-cycle
       const STATUS_LABEL = { waiting: 'Needs input', busy: 'Working', idle: 'Waiting for prompt', shell: 'In shell', ended: 'Ended' };
 
       const el = id => document.getElementById(id);
@@ -244,7 +262,7 @@
         try { localStorage.setItem(key, JSON.stringify(value)); } catch (error) {}
       };
 
-      const state = { firstPoll: true, inFlight: false, timer: null, notified: load('notified', {}) };
+      const state = { firstPoll: true, inFlight: false, timer: null, notified: load('notified', {}), acked: load('acked', {}) };
 
       const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
       const basename = path => path ? path.replace(/\/+$/, '').split('/').pop() : '';
@@ -267,6 +285,8 @@
       const fmtTime = ms => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const fmtCost = usd => usd == null ? '–' : '$' + usd.toFixed(2);
       const fmtSince = ms => ms >= 3600000 ? Math.round(ms / 3600000) + ' h' : Math.round(ms / 60000) + ' min';
+
+      const ackKey = session => session.statusUpdatedAt || 0;
 
       function newestPending(session) {
         const pending = (session.transcript || {}).pendingTools || [];
@@ -303,8 +323,9 @@
         ].filter(Boolean).join(' · ');
         const recent = (transcript.recentTools || []).slice().reverse()
           .map(tool => `<div class="tool"><span class="tag">${esc(tool.name)}</span>${esc(truncate(tool.summary, 70))}</div>`).join('');
+        const acked = state.acked[session.sessionId] === ackKey(session);
         return `
-          <article class="card ${esc(session.status)}">
+          <article class="card ${esc(session.status)}${acked ? ' acked' : ''}" style="animation-delay: ${-(now % PULSE_MS)}ms" data-session="${esc(session.sessionId)}" data-status-at="${ackKey(session)}">
             <div>
               <span class="pill ${esc(session.status)}">${esc(STATUS_LABEL[session.status] || session.status)}</span>
               ${session.statusUpdatedAt ? `<span class="since">for ${fmtDuration(now - session.statusUpdatedAt)}</span>` : ''}
@@ -344,11 +365,16 @@
         const live = data.sessions.filter(session => session.live);
         const ended = data.sessions.filter(session => !session.live);
         const count = status => live.filter(session => session.status === status).length;
+        state.acked = Object.fromEntries(live
+          .filter(session => state.acked[session.sessionId] === ackKey(session))
+          .map(session => [session.sessionId, ackKey(session)]));
+        save('acked', state.acked);
         const waiting = count('waiting');
+        const free = count('idle') + count('shell');
         el('kpis').innerHTML =
           tile('Needs input', waiting, waiting > 0) +
           tile('Working', count('busy'), false) +
-          tile('Waiting for prompt', count('idle') + count('shell'), false) +
+          tile('Waiting for prompt', free, free > 0) +
           tile('Ended in the last ' + fmtSince(data.sinceMs), ended.length, false);
         el('live').innerHTML = live.length
           ? live.map(session => card(session, now)).join('')
@@ -419,6 +445,7 @@
 
       function setTheme(theme) {
         document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]').content = getComputedStyle(document.documentElement).getPropertyValue('--ivory').trim();
         el('themeBtn').textContent = theme === 'dark' ? 'Light mode' : 'Dark mode';
       }
 
@@ -439,6 +466,13 @@
       });
       el('notifyIdle').checked = load('notifyIdle', true);
       el('notifyIdle').addEventListener('change', event => save('notifyIdle', event.target.checked));
+      el('live').addEventListener('click', event => {
+        const card = event.target.closest('.card');
+        if (!card) return;
+        state.acked[card.dataset.session] = Number(card.dataset.statusAt);
+        save('acked', state.acked);
+        card.classList.add('acked');
+      });
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') poll();
       });
@@ -446,6 +480,10 @@
       setTheme(document.documentElement.dataset.theme);
       syncNotifyUi();
       poll();
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      }
     })();
   </script>
 </body>
