@@ -22,6 +22,13 @@ ENDED_LIMIT = 20
 SNAPSHOT_TTL_SECONDS = 2.0
 NEGATIVE_LOOKUP_TTL_SECONDS = 10.0
 WORKSPACE_PREFIX = '/workspace/'
+STATIC_FILES = {
+    '/': ('index.html', 'text/html; charset=utf-8'),
+    '/sw.js': ('sw.js', 'text/javascript'),
+    '/manifest.webmanifest': ('manifest.webmanifest', 'application/manifest+json'),
+    '/icon.svg': ('icon.svg', 'image/svg+xml'),
+    '/icon-512.png': ('icon-512.png', 'image/png')
+}
 
 last_good_registry = {}
 
@@ -336,8 +343,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         url = urlparse(self.path)
-        if url.path == '/':
-            self.serve_file(os.path.join(self.static_dir, 'index.html'), 'text/html; charset=utf-8')
+        if url.path in STATIC_FILES:
+            name, content_type = STATIC_FILES[url.path]
+            self.serve_file(os.path.join(self.static_dir, name), content_type)
         elif url.path == '/api/sessions':
             since_ms = parse_since(parse_qs(url.query).get('since', [''])[0])
             try:

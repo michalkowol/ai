@@ -59,13 +59,20 @@ when given explicitly. It is not supported with `--bash`.
 
 Every `ai` run starts a single `ai-dashboard` container serving
 http://localhost:8787: live and recently ended Claude Code sessions, what each
-one is doing right now and which ones wait for input. It refreshes every 10 s.
+one is doing right now and which ones wait for input. It refreshes every 3 s.
 Click **Enable notifications** to get a browser notification when a session
 needs input or finishes a turn.
 
+It installs as a PWA, with the Claude mark as its icon: in Chrome pick
+**Install** from the address bar, in Safari **File → Add to Dock**. The
+installed app runs in its own window and keeps the notifications.
+
+- a card pulses while its session waits for you, click it to acknowledge and stop the pulse
 - the theme follows the operating system, the **Dark mode** / **Light mode** button overrides it
 - `ai --without-dashboard` skips it, `AI_DASHBOARD_PORT=9000 ai` changes the port
 - `docker restart ai-dashboard` after editing `dashboard/`, `docker rm -f ai-dashboard` stops it
+- the service worker goes to the network first and only caches the app shell, so a reload
+  always picks up an edited `dashboard/` instead of a stale copy
 - each container gets a private session registry in `claude/.claude/ai-runs/<run-id>/`,
   removed when the container exits
 
@@ -105,7 +112,7 @@ chmod 600 ~/.ai/settings.env
 .
 ├── Dockerfile         # Configurable base (via --java / --node) + Claude + Cursor + Docker CLI + gh
 ├── ai                 # Launcher script
-├── dashboard/         # Sessions dashboard: server.py + index.html, run as the ai-dashboard container
+├── dashboard/         # Sessions dashboard: server.py + index.html + PWA manifest, service worker, icons
 ├── claude/            # Per-tool config mounted into the container
 ├── cursor/
 ├── common/
