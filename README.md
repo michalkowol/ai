@@ -60,16 +60,23 @@ when given explicitly. It is not supported with `--bash`.
 Every `ai` run starts a single `ai-dashboard` container serving
 http://localhost:8787: live and recently ended Claude Code sessions, what each
 one is doing right now and which ones wait for input. It refreshes every 3 s.
-Click **Enable notifications** to get a browser notification when a session
-needs input or finishes a turn.
+Click **Notifications on** to get a browser notification when a session needs
+input or finishes a turn, **Notifications off** stops them again.
 
 It installs as a PWA, with the Claude mark as its icon: in Chrome pick
 **Install** from the address bar, in Safari **File → Add to Dock**. The
 installed app runs in its own window and keeps the notifications.
 
-- a card pulses while its session waits for you, click it to acknowledge and stop the pulse
+- a card pulses while its session waits for you, click anywhere to acknowledge and stop the pulse
+- **Flash on** flashes the whole page red while a session needs input, **Sound on** pings the Nostromo sonar
+  (two low pings every 6 s) for the same thing. The two are independent and both are remembered
+- both follow the same trigger as the notifications: any session that needs input or has just finished its
+  turn. A click anywhere on the page dismisses them, the next session that needs you brings them back. The
+  browser keeps the sound muted until you have clicked the page once
 - the **Compact view** button trims each card down to status, title, the branch/model/effort line, what it does now,
   elapsed, cost and tokens, dropping the session id; the choice is remembered
+- the **Ended in the last 24 h** tile carries the summed cost of those sessions (`~$3.75`), taking the higher
+  of the recorded and the estimated cost of each one
 - live cards show an estimated cost and token count (`~$1.20`, `~8.6M`) summed from the token usage in the
   transcript, because Claude Code records its own cost only when a session exits or compacts its context; the card
   shows whichever of the two is higher, as both are lower bounds. Subagent calls never land in the transcript, so
