@@ -115,17 +115,12 @@
       cursor: pointer;
     }
 
-    button.btn.primary {
-      background: var(--slate);
-      border-color: var(--slate);
-      color: var(--ivory);
-    }
+    button.btn:disabled { opacity: 0.5; cursor: default; }
 
     .wrap { max-width: 1100px; margin: 0 auto; padding: 48px 32px 96px; }
 
     .top { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: 28px; }
     .controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 14px; }
-    .controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
     .hint { font-size: 13px; color: var(--gray-500); }
 
     .banner {
@@ -202,6 +197,25 @@
     .empty { color: var(--gray-500); padding: 24px 0; }
     .foot { margin-top: 28px; font-size: 13px; color: var(--gray-500); }
 
+    .alarm {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      pointer-events: none;
+      background: #E5484D;
+      opacity: 0;
+    }
+    :root[data-alarm="ringing"] .alarm { animation: alarm 900ms ease-in-out infinite; }
+
+    @keyframes alarm {
+      0%, 100% { opacity: 0.05; }
+      50%      { opacity: 0.5; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :root[data-alarm="ringing"] .alarm { animation: none; opacity: 0.3; }
+    }
+
     :root[data-compact="on"] .card {
       grid-template-columns: minmax(0, 1fr) auto;
       align-items: baseline;
@@ -268,10 +282,10 @@
         <h1>Sessions</h1>
       </div>
       <div class="controls">
-        <label><input type="checkbox" id="notifyIdle"> Notify when a turn finishes</label>
-        <button class="btn primary" id="notifyBtn" hidden>Enable notifications</button>
-        <span class="pill" id="notifyOn" hidden>notifications on</span>
+        <button class="btn" id="notifyBtn"></button>
         <span class="hint" id="notifyDenied" hidden>Notifications are blocked for this site in the browser settings</span>
+        <button class="btn" id="alarmBtn"></button>
+        <button class="btn" id="soundBtn"></button>
         <button class="btn" id="themeBtn"></button>
         <button class="btn" id="compactBtn"></button>
       </div>
@@ -284,6 +298,8 @@
     <section class="ended" id="ended"></section>
     <footer class="foot" id="foot"></footer>
   </div>
+
+  <div class="alarm" aria-hidden="true"></div>
 
   <script>
     (() => {
@@ -306,7 +322,18 @@
         try { localStorage.setItem(key, JSON.stringify(value)); } catch (error) {}
       };
 
-      const state = { firstPoll: true, inFlight: false, timer: null, notified: load('notified', {}), acked: load('acked', {}) };
+      const state = {
+        firstPoll: true,
+        inFlight: false,
+        timer: null,
+        notified: load('notified', {}),
+        acked: load('acked', {}),
+        alarm: load('alarm', false),
+        notify: load('notify', true),
+        sound: load('soundOn', true),
+        sessions: []
+      };
+      const siren = { context: null, timer: null };
 
       const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
       const basename = path => path ? path.replace(/\/+$/, '').split('/').pop() : '';
@@ -338,6 +365,11 @@
 
       // Claude Code writes its own cost only at exit and at a context compaction, so a live session gets the
       // higher of that checkpoint and the tokens seen so far: both are lower bounds of what it has spent.
+      function sessionCost(session) {
+        const transcript = session.transcript || {};
+        return Math.max((transcript.cost || {}).usd || 0, transcript.estimatedCostUSD || 0);
+      }
+
       function usageInfo(session) {
         const transcript = session.transcript || {};
         const reported = (transcript.cost || {}).usd;
@@ -439,11 +471,12 @@
         save('acked', state.acked);
         const waiting = count('waiting');
         const free = count('idle') + count('shell');
+        const endedCost = ended.reduce((total, session) => total + sessionCost(session), 0);
         el('kpis').innerHTML =
           tile('Needs input', waiting, waiting > 0) +
           tile('Working', count('busy'), false) +
           tile('Waiting for prompt', free, free > 0) +
-          tile('Ended in the last ' + fmtSince(data.sinceMs), ended.length, false);
+          tile('Ended in the last ' + fmtSince(data.sinceMs) + ' · ~' + fmtCost(endedCost), ended.length, false);
         el('live').innerHTML = live.length
           ? live.map(session => card(session, now)).join('')
           : '<p class="empty">No live Claude sessions. Start one with <code>ai</code>.</p>';
@@ -451,9 +484,11 @@
         el('foot').textContent = data.runsWithoutSession ? data.runsWithoutSession + ' container(s) running without a Claude session' : '';
         el('updated').textContent = 'updated ' + new Date(now).toLocaleTimeString();
         document.title = (waiting ? '(' + waiting + ') ' : '') + 'Claude sessions';
+        state.sessions = data.sessions;
+        refreshAlarm();
       }
 
-      const canNotify = () => 'Notification' in window && Notification.permission === 'granted';
+      const canNotify = () => state.notify && 'Notification' in window && Notification.permission === 'granted';
 
       function show(title, body, tag) {
         const notification = new Notification(title, { body, tag });
@@ -473,12 +508,82 @@
           }
           if (session.status === 'idle' && session.statusUpdatedAt && previous.idle !== session.statusUpdatedAt) {
             current.idle = session.statusUpdatedAt;
-            if (canNotify() && known && !state.firstPoll && el('notifyIdle').checked) show('Finished · ' + session.title, truncate(nowText(session), 160), session.sessionId);
+            if (canNotify() && known && !state.firstPoll) show('Finished · ' + session.title, truncate(nowText(session), 160), session.sessionId);
           }
           notified[session.sessionId] = current;
         }
         state.notified = notified;
         save('notified', notified);
+      }
+
+      function openSiren() {
+        const Context = window.AudioContext || window.webkitAudioContext;
+        if (!siren.context && Context) siren.context = new Context();
+        // Browsers start the context suspended until the page has seen a user gesture.
+        if (siren.context && siren.context.state === 'suspended') siren.context.resume().catch(() => {});
+      }
+
+      function tone(context, { at, frequency, slideTo, duration, type = 'sine', peak = 0.08, attack = 0.02 }) {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(frequency, at);
+        if (slideTo) oscillator.frequency.exponentialRampToValueAtTime(slideTo, at + duration);
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.linearRampToValueAtTime(peak, at + attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+        oscillator.connect(gain).connect(context.destination);
+        oscillator.start(at);
+        oscillator.stop(at + duration + 0.05);
+      }
+
+      const SOUND_INTERVAL = 6000;
+
+      // Two low sonar pings, the Nostromo's idle bridge chatter.
+      function nostromo(context, at) {
+        tone(context, { at, frequency: 220, duration: 0.9, peak: 0.07 });
+        tone(context, { at: at + 0.55, frequency: 165, duration: 1.2, peak: 0.055 });
+      }
+
+      function play() {
+        const context = siren.context;
+        if (!context || context.state !== 'running') return;
+        nostromo(context, context.currentTime + 0.02);
+      }
+
+      function stopSiren() {
+        clearInterval(siren.timer);
+        siren.timer = null;
+      }
+
+      function needsAttention(session) {
+        return session.live && (session.status === 'waiting' || session.status === 'idle');
+      }
+
+      function refreshAlarm() {
+        const alerting = state.sessions.some(session =>
+          needsAttention(session) && state.acked[session.sessionId] !== ackKey(session));
+        document.documentElement.dataset.alarm = alerting && state.alarm ? 'ringing' : 'off';
+        if (alerting && state.sound && !siren.timer) {
+          openSiren();
+          play();
+          siren.timer = setInterval(play, SOUND_INTERVAL);
+        } else if ((!alerting || !state.sound) && siren.timer) {
+          stopSiren();
+        }
+      }
+
+      function setAlarm(alarm) {
+        state.alarm = alarm;
+        el('alarmBtn').textContent = alarm ? 'Flash off' : 'Flash on';
+        refreshAlarm();
+      }
+
+      function setSound(on) {
+        state.sound = on;
+        el('soundBtn').textContent = on ? 'Sound off' : 'Sound on';
+        if (on) openSiren(); else stopSiren();
+        refreshAlarm();
       }
 
       async function poll() {
@@ -506,9 +611,11 @@
 
       function syncNotifyUi() {
         const supported = 'Notification' in window;
-        el('notifyBtn').hidden = !supported || Notification.permission !== 'default';
-        el('notifyOn').hidden = !supported || Notification.permission !== 'granted';
-        el('notifyDenied').hidden = !supported || Notification.permission !== 'denied';
+        const denied = supported && Notification.permission === 'denied';
+        el('notifyBtn').hidden = !supported;
+        el('notifyBtn').disabled = denied;
+        el('notifyBtn').textContent = canNotify() ? 'Notifications off' : 'Notifications on';
+        el('notifyDenied').hidden = !denied;
       }
 
       function setTheme(theme) {
@@ -544,24 +651,57 @@
       });
 
       el('notifyBtn').addEventListener('click', async () => {
-        try { await Notification.requestPermission(); } catch (error) {}
+        if (canNotify()) {
+          state.notify = false;
+        } else {
+          if (Notification.permission === 'default') {
+            try { await Notification.requestPermission(); } catch (error) {}
+          }
+          state.notify = Notification.permission === 'granted';
+        }
+        save('notify', state.notify);
         syncNotifyUi();
       });
-      el('notifyIdle').checked = load('notifyIdle', true);
-      el('notifyIdle').addEventListener('change', event => save('notifyIdle', event.target.checked));
-      el('live').addEventListener('click', event => {
-        const card = event.target.closest('.card');
-        if (!card) return;
-        state.acked[card.dataset.session] = Number(card.dataset.statusAt);
+      el('alarmBtn').addEventListener('click', () => {
+        const alarm = !state.alarm;
+        save('alarm', alarm);
+        setAlarm(alarm);
+      });
+      el('soundBtn').addEventListener('click', () => {
+        const on = !state.sound;
+        save('soundOn', on);
+        setSound(on);
+        if (on) play();
+      });
+      // The alarm only has to catch the eye: any click anywhere says it did, until the next thing comes up.
+      addEventListener('click', () => {
+        let acked = false;
+        for (const session of state.sessions) {
+          if (session.live && state.acked[session.sessionId] !== ackKey(session)) {
+            state.acked[session.sessionId] = ackKey(session);
+            acked = true;
+          }
+        }
+        if (!acked) return;
         save('acked', state.acked);
-        card.classList.add('acked');
+        for (const card of el('live').children) card.classList.add('acked');
+        refreshAlarm();
       });
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') poll();
       });
 
+      const unlockSiren = () => {
+        if (!state.sound) return;
+        openSiren();
+        removeEventListener('pointerdown', unlockSiren);
+      };
+      addEventListener('pointerdown', unlockSiren);
+
       setTheme(document.documentElement.dataset.theme);
       setCompact(document.documentElement.dataset.compact === 'on');
+      setAlarm(state.alarm);
+      setSound(state.sound);
       syncNotifyUi();
       poll();
 
