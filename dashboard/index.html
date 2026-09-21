@@ -333,7 +333,7 @@
         sound: load('soundOn', true),
         sessions: []
       };
-      const siren = { context: null, timer: null };
+      const siren = { context: null, played: false };
 
       const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
       const basename = path => path ? path.replace(/\/+$/, '').split('/').pop() : '';
@@ -537,8 +537,6 @@
         oscillator.stop(at + duration + 0.05);
       }
 
-      const SOUND_INTERVAL = 6000;
-
       // Two low sonar pings, the Nostromo's idle bridge chatter.
       function nostromo(context, at) {
         tone(context, { at, frequency: 220, duration: 0.9, peak: 0.07 });
@@ -552,8 +550,7 @@
       }
 
       function stopSiren() {
-        clearInterval(siren.timer);
-        siren.timer = null;
+        siren.played = false;
       }
 
       function needsAttention(session) {
@@ -564,11 +561,11 @@
         const alerting = state.sessions.some(session =>
           needsAttention(session) && state.acked[session.sessionId] !== ackKey(session));
         document.documentElement.dataset.alarm = alerting && state.alarm ? 'ringing' : 'off';
-        if (alerting && state.sound && !siren.timer) {
+        if (alerting && state.sound && !siren.played) {
           openSiren();
           play();
-          siren.timer = setInterval(play, SOUND_INTERVAL);
-        } else if ((!alerting || !state.sound) && siren.timer) {
+          siren.played = true;
+        } else if (!alerting || !state.sound) {
           stopSiren();
         }
       }
