@@ -68,6 +68,12 @@ It installs as a PWA, with the Claude mark as its icon: in Chrome pick
 installed app runs in its own window and keeps the notifications.
 
 - a card pulses while its session waits for you, click it to acknowledge and stop the pulse
+- the **Compact view** button trims each card down to status, title, the branch/model/effort line, what it does now,
+  elapsed, cost and tokens, dropping the session id; the choice is remembered
+- live cards show an estimated cost and token count (`~$1.20`, `~8.6M`) summed from the token usage in the
+  transcript, because Claude Code records its own cost only when a session exits or compacts its context; the card
+  shows whichever of the two is higher, as both are lower bounds. Subagent calls never land in the transcript, so
+  sessions that lean on subagents read low. Ended sessions show the exact cost
 - the theme follows the operating system, the **Dark mode** / **Light mode** button overrides it
 - `ai --without-dashboard` skips it, `AI_DASHBOARD_PORT=9000 ai` changes the port
 - `docker restart ai-dashboard` after editing `dashboard/`, `docker rm -f ai-dashboard` stops it

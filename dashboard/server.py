@@ -22,6 +22,16 @@ ENDED_LIMIT = 20
 SNAPSHOT_TTL_SECONDS = 2.0
 NEGATIVE_LOOKUP_TTL_SECONDS = 10.0
 WORKSPACE_PREFIX = '/workspace/'
+# Input, output and cache-read price per million tokens; cache writes cost 1.25x input (5 min TTL) and 2x (1 h).
+MODEL_PRICES = {
+    'claude-fable-5-1': (10.0, 50.0, 0.25),
+    'claude-fable-5': (10.0, 50.0, 1.0),
+    'claude-opus-5': (5.0, 25.0, 0.5),
+    'claude-opus-4': (5.0, 25.0, 0.5),
+    'claude-sonnet-5': (2.0, 10.0, 0.2),
+    'claude-sonnet-4': (3.0, 15.0, 0.3),
+    'claude-haiku-4-5': (1.0, 5.0, 0.1)
+}
 STATIC_FILES = {
     '/': ('index.html', 'text/html; charset=utf-8'),
     '/sw.js': ('sw.js', 'text/javascript'),
@@ -143,12 +153,44 @@ def tool_summary(name, tool_input):
     return text[:120] if text else (name or '')
 
 
+def usage_tokens(usage):
+    creation = usage.get('cache_creation') or {}
+    total = (usage.get('input_tokens') or 0) + (usage.get('output_tokens') or 0)
+    total += usage.get('cache_read_input_tokens') or 0
+    if creation:
+        total += (creation.get('ephemeral_5m_input_tokens') or 0) + (creation.get('ephemeral_1h_input_tokens') or 0)
+    else:
+        total += usage.get('cache_creation_input_tokens') or 0
+    return total
+
+
+def usage_cost(usage, model):
+    prefix = max((key for key in MODEL_PRICES if model and model.startswith(key)), key=len, default=None)
+    if not prefix:
+        return 0.0
+    input_price, output_price, read_price = MODEL_PRICES[prefix]
+    creation = usage.get('cache_creation') or {}
+    total = (usage.get('input_tokens') or 0) * input_price
+    total += (usage.get('output_tokens') or 0) * output_price
+    total += (usage.get('cache_read_input_tokens') or 0) * read_price
+    if creation:
+        total += (creation.get('ephemeral_5m_input_tokens') or 0) * input_price * 1.25
+        total += (creation.get('ephemeral_1h_input_tokens') or 0) * input_price * 2.0
+    else:
+        total += (usage.get('cache_creation_input_tokens') or 0) * input_price * 1.25
+    return total / 1_000_000
+
+
 def summarize_transcript(path):
     title = last_prompt = last_assistant_text = branch = model = permission_mode = cost = None
+    effort = None
     turns = 0
     last_turn_ended_at = last_turn_duration_ms = None
     pending_tools = {}
     recent_tools = deque(maxlen=3)
+    estimated_cost = 0.0
+    estimated_tokens = 0
+    priced_messages = set()
     with open(path, encoding='utf-8', errors='replace') as fh:
         for line in fh:
             try:
@@ -162,7 +204,14 @@ def summarize_transcript(path):
                 message = record.get('message') or {}
                 branch = record.get('gitBranch') or branch
                 model = message.get('model') or model
+                effort = record.get('effort') or effort
                 at = parse_timestamp(record.get('timestamp'))
+                usage = message.get('usage')
+                message_id = message.get('id') or record.get('requestId')
+                if usage and message_id not in priced_messages:
+                    priced_messages.add(message_id)
+                    estimated_cost += usage_cost(usage, message.get('model'))
+                    estimated_tokens += usage_tokens(usage)
                 for block in content_blocks(message):
                     if block.get('type') == 'tool_use':
                         tool = {'name': block.get('name'), 'summary': tool_summary(block.get('name'), block.get('input')), 'at': at}
@@ -201,12 +250,15 @@ def summarize_transcript(path):
         'branch': branch,
         'model': model,
         'permissionMode': permission_mode,
+        'effort': effort,
         'turns': turns,
         'lastTurnEndedAt': last_turn_ended_at,
         'lastTurnDurationMs': last_turn_duration_ms,
         'pendingTools': list(pending_tools.values()),
         'recentTools': list(recent_tools),
-        'cost': cost
+        'cost': cost,
+        'estimatedCostUSD': round(estimated_cost, 4),
+        'estimatedTokens': estimated_tokens
     }
 
 
