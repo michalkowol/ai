@@ -75,6 +75,10 @@ installed app runs in its own window and keeps the notifications.
 - both follow the same trigger as the notifications: any session that needs input or has just finished its
   turn. A click anywhere on the page dismisses them, the next session that needs you brings them back. The
   browser keeps the sound muted until you have clicked the page once
+- **Ntfy** pushes the same alerts to [ntfy.sh](https://ntfy.sh), so they reach your phone: switch it on, type a
+  topic into the field next to the button and subscribe to that topic in the ntfy app. Switching it on with a
+  topic already set sends a test push. The topic is the only secret, anyone who knows it can read and publish
+  to it, so pick something unguessable. Pushes go out only while a dashboard tab is open
 - the **Compact view** button trims each card down to status, title, the branch/model/effort line, what it does now,
   elapsed, cost and tokens, dropping the session id; the choice is remembered
 - the **Ended in the last 24 h** tile carries the summed cost of those sessions (`~$3.75`), taking the higher
