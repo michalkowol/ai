@@ -60,16 +60,18 @@ when given explicitly. It is not supported with `--bash`.
 Every `ai` run starts a single `ai-dashboard` container serving
 http://localhost:8787: live and recently ended Claude Code sessions, what each
 one is doing right now and which ones wait for input. It refreshes every 3 s.
-Click **Notifications on** to get a browser notification when a session needs
-input or finishes a turn, **Notifications off** stops them again.
+Click the **Notifications** button to allow browser notifications when a session needs input or finishes a
+turn; the label always shows the current state (`Notifications on` / `Notifications off`).
 
 It installs as a PWA, with the Claude mark as its icon: in Chrome pick
 **Install** from the address bar, in Safari **File → Add to Dock**. The
 installed app runs in its own window and keeps the notifications.
 
 - a card pulses while its session waits for you, click anywhere to acknowledge and stop the pulse
-- **Flash on** flashes the whole page red while a session needs input, **Sound on** pings the Nostromo sonar
-  (two low pings every 6 s) for the same thing. The two are independent and both are remembered
+- **Flash** and **Sound** each cycle through three states on click, off → on → on (loop) → off, and the
+  label always shows the current one. **Flash on** flashes the whole page red once, **Flash on (loop)** keeps
+  flashing until acknowledged. **Sound on** pings the Nostromo sonar (two low pings) once, **Sound on (loop)**
+  repeats it every 6 s. The two are independent and both are remembered
 - both follow the same trigger as the notifications: any session that needs input or has just finished its
   turn. A click anywhere on the page dismisses them, the next session that needs you brings them back. The
   browser keeps the sound muted until you have clicked the page once
