@@ -104,7 +104,7 @@
       border-radius: 6px;
     }
 
-    button.btn {
+    .btn {
       font-family: var(--sans);
       font-size: 14px;
       padding: 9px 16px;
@@ -116,6 +116,8 @@
     }
 
     button.btn:disabled { opacity: 0.5; cursor: default; }
+
+    input.btn { width: 170px; cursor: text; }
 
     /* toggle buttons reflect a persistent setting: a dot shows the current state at a glance */
     button.btn.toggle { position: relative; padding-left: 26px; }
@@ -304,6 +306,8 @@
         <span class="hint" id="notifyDenied" hidden>Notifications are blocked for this site in the browser settings</span>
         <button class="btn toggle" id="alarmBtn"></button>
         <button class="btn toggle" id="soundBtn"></button>
+        <button class="btn toggle" id="ntfyBtn"></button>
+        <input class="btn" id="ntfyTopic" type="text" placeholder="ntfy.sh topic" spellcheck="false" hidden>
         <button class="btn" id="themeBtn"></button>
         <button class="btn" id="compactBtn"></button>
       </div>
@@ -349,6 +353,8 @@
         flash: load('flash', 'off'),
         notify: load('notify', true),
         sound: load('sound', 'on'),
+        ntfy: load('ntfy', false),
+        ntfyTopic: load('ntfyTopic', ''),
         sessions: []
       };
       const siren = { context: null, played: false, timer: null };
@@ -517,6 +523,21 @@
         notification.onclick = () => { window.focus(); notification.close(); };
       }
 
+      // ntfy takes the topic in the JSON body, so a text/plain type keeps the POST free of a CORS preflight.
+      function push(title, body) {
+        if (!state.ntfy || !state.ntfyTopic) return;
+        fetch('https://ntfy.sh/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+          body: JSON.stringify({ topic: state.ntfyTopic, title, message: body })
+        }).catch(() => {});
+      }
+
+      function announce(title, body, tag) {
+        if (canNotify()) show(title, body, tag);
+        push(title, body);
+      }
+
       function notify(data) {
         const notified = {};
         for (const session of data.sessions) {
@@ -526,11 +547,11 @@
           const current = { waiting: previous.waiting, idle: previous.idle };
           if (session.status === 'waiting' && session.statusUpdatedAt && previous.waiting !== session.statusUpdatedAt) {
             current.waiting = session.statusUpdatedAt;
-            if (canNotify()) show('Needs input · ' + session.title, truncate(nowText(session), 160), session.sessionId);
+            announce('Needs input · ' + session.title, truncate(nowText(session), 160), session.sessionId);
           }
           if (session.status === 'idle' && session.statusUpdatedAt && previous.idle !== session.statusUpdatedAt) {
             current.idle = session.statusUpdatedAt;
-            if (canNotify() && known && !state.firstPoll) show('Finished · ' + session.title, truncate(nowText(session), 160), session.sessionId);
+            if (known && !state.firstPoll) announce('Finished · ' + session.title, truncate(nowText(session), 160), session.sessionId);
           }
           notified[session.sessionId] = current;
         }
@@ -623,6 +644,13 @@
         refreshAlarm();
       }
 
+      function setNtfy(on) {
+        state.ntfy = on;
+        el('ntfyBtn').textContent = on ? 'Ntfy on' : 'Ntfy off';
+        el('ntfyBtn').dataset.mode = on && state.ntfyTopic ? 'on' : 'off';
+        el('ntfyTopic').hidden = !on;
+      }
+
       async function poll() {
         if (state.inFlight) return;
         state.inFlight = true;
@@ -711,6 +739,19 @@
         setSound(mode);
         if (mode !== 'off') play();
       });
+      el('ntfyBtn').addEventListener('click', () => {
+        const on = !state.ntfy;
+        save('ntfy', on);
+        setNtfy(on);
+        if (!on) return;
+        if (state.ntfyTopic) push('Ntfy on', 'This dashboard will push here when a session needs you');
+        else el('ntfyTopic').focus();
+      });
+      el('ntfyTopic').addEventListener('input', () => {
+        state.ntfyTopic = el('ntfyTopic').value.trim();
+        save('ntfyTopic', state.ntfyTopic);
+        setNtfy(state.ntfy);
+      });
       // The alarm only has to catch the eye: any click anywhere says it did, until the next thing comes up.
       addEventListener('click', () => {
         let acked = false;
@@ -740,6 +781,8 @@
       setCompact(document.documentElement.dataset.compact === 'on');
       setFlash(state.flash);
       setSound(state.sound);
+      el('ntfyTopic').value = state.ntfyTopic;
+      setNtfy(state.ntfy);
       syncNotifyUi();
       poll();
 
