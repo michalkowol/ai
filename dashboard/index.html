@@ -117,10 +117,26 @@
 
     button.btn:disabled { opacity: 0.5; cursor: default; }
 
+    /* toggle buttons reflect a persistent setting: a dot shows the current state at a glance */
+    button.btn.toggle { position: relative; padding-left: 26px; }
+    button.btn.toggle::before {
+      content: '';
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--gray-300);
+      transform: translateY(-50%);
+    }
+    button.btn.toggle[data-mode="on"]::before,
+    button.btn.toggle[data-mode="loop"]::before { background: var(--olive); }
+
     .wrap { max-width: 1100px; margin: 0 auto; padding: 48px 32px 96px; }
 
-    .top { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: 28px; }
-    .controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 14px; }
+    .top { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 28px; }
+    .controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 14px; flex-basis: 100%; }
     .hint { font-size: 13px; color: var(--gray-500); }
 
     .banner {
@@ -205,7 +221,8 @@
       background: #E5484D;
       opacity: 0;
     }
-    :root[data-alarm="ringing"] .alarm { animation: alarm 900ms ease-in-out infinite; }
+    :root[data-alarm="on"]   .alarm { animation: alarm 900ms ease-in-out 1; }
+    :root[data-alarm="loop"] .alarm { animation: alarm 900ms ease-in-out infinite; }
 
     @keyframes alarm {
       0%, 100% { opacity: 0.05; }
@@ -213,7 +230,8 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      :root[data-alarm="ringing"] .alarm { animation: none; opacity: 0.3; }
+      :root[data-alarm="on"]   .alarm { animation: none; opacity: 0; }
+      :root[data-alarm="loop"] .alarm { animation: none; opacity: 0.3; }
     }
 
     :root[data-compact="on"] .card {
@@ -282,10 +300,10 @@
         <h1>Sessions</h1>
       </div>
       <div class="controls">
-        <button class="btn" id="notifyBtn"></button>
+        <button class="btn toggle" id="notifyBtn"></button>
         <span class="hint" id="notifyDenied" hidden>Notifications are blocked for this site in the browser settings</span>
-        <button class="btn" id="alarmBtn"></button>
-        <button class="btn" id="soundBtn"></button>
+        <button class="btn toggle" id="alarmBtn"></button>
+        <button class="btn toggle" id="soundBtn"></button>
         <button class="btn" id="themeBtn"></button>
         <button class="btn" id="compactBtn"></button>
       </div>
@@ -328,12 +346,16 @@
         timer: null,
         notified: load('notified', {}),
         acked: load('acked', {}),
-        alarm: load('alarm', false),
+        flash: load('flash', 'off'),
         notify: load('notify', true),
-        sound: load('soundOn', true),
+        sound: load('sound', 'on'),
         sessions: []
       };
-      const siren = { context: null, played: false };
+      const siren = { context: null, played: false, timer: null };
+      const MODE_CYCLE = ['off', 'on', 'loop'];
+      const nextMode = mode => MODE_CYCLE[(MODE_CYCLE.indexOf(mode) + 1) % MODE_CYCLE.length];
+      const SOUND_LABEL = { off: 'Sound off', on: 'Sound on', loop: 'Sound on (loop)' };
+      const FLASH_LABEL = { off: 'Flash off', on: 'Flash on', loop: 'Flash on (loop)' };
 
       const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
       const basename = path => path ? path.replace(/\/+$/, '').split('/').pop() : '';
@@ -549,8 +571,12 @@
         nostromo(context, context.currentTime + 0.02);
       }
 
+      const SOUND_INTERVAL = 6000;
+
       function stopSiren() {
         siren.played = false;
+        clearInterval(siren.timer);
+        siren.timer = null;
       }
 
       function needsAttention(session) {
@@ -560,26 +586,40 @@
       function refreshAlarm() {
         const alerting = state.sessions.some(session =>
           needsAttention(session) && state.acked[session.sessionId] !== ackKey(session));
-        document.documentElement.dataset.alarm = alerting && state.alarm ? 'ringing' : 'off';
-        if (alerting && state.sound && !siren.played) {
-          openSiren();
-          play();
-          siren.played = true;
-        } else if (!alerting || !state.sound) {
+        document.documentElement.dataset.alarm = alerting ? state.flash : 'off';
+
+        if (!alerting || state.sound === 'off') {
           stopSiren();
+          return;
+        }
+        openSiren();
+        if (state.sound === 'loop') {
+          if (!siren.timer) {
+            play();
+            siren.timer = setInterval(play, SOUND_INTERVAL);
+          }
+        } else {
+          clearInterval(siren.timer);
+          siren.timer = null;
+          if (!siren.played) {
+            play();
+            siren.played = true;
+          }
         }
       }
 
-      function setAlarm(alarm) {
-        state.alarm = alarm;
-        el('alarmBtn').textContent = alarm ? 'Flash off' : 'Flash on';
+      function setFlash(mode) {
+        state.flash = mode;
+        el('alarmBtn').textContent = FLASH_LABEL[mode];
+        el('alarmBtn').dataset.mode = mode;
         refreshAlarm();
       }
 
-      function setSound(on) {
-        state.sound = on;
-        el('soundBtn').textContent = on ? 'Sound off' : 'Sound on';
-        if (on) openSiren(); else stopSiren();
+      function setSound(mode) {
+        state.sound = mode;
+        el('soundBtn').textContent = SOUND_LABEL[mode];
+        el('soundBtn').dataset.mode = mode;
+        if (mode === 'off') stopSiren(); else openSiren();
         refreshAlarm();
       }
 
@@ -611,7 +651,8 @@
         const denied = supported && Notification.permission === 'denied';
         el('notifyBtn').hidden = !supported;
         el('notifyBtn').disabled = denied;
-        el('notifyBtn').textContent = canNotify() ? 'Notifications off' : 'Notifications on';
+        el('notifyBtn').textContent = canNotify() ? 'Notifications on' : 'Notifications off';
+        el('notifyBtn').dataset.mode = canNotify() ? 'on' : 'off';
         el('notifyDenied').hidden = !denied;
       }
 
@@ -660,15 +701,15 @@
         syncNotifyUi();
       });
       el('alarmBtn').addEventListener('click', () => {
-        const alarm = !state.alarm;
-        save('alarm', alarm);
-        setAlarm(alarm);
+        const mode = nextMode(state.flash);
+        save('flash', mode);
+        setFlash(mode);
       });
       el('soundBtn').addEventListener('click', () => {
-        const on = !state.sound;
-        save('soundOn', on);
-        setSound(on);
-        if (on) play();
+        const mode = nextMode(state.sound);
+        save('sound', mode);
+        setSound(mode);
+        if (mode !== 'off') play();
       });
       // The alarm only has to catch the eye: any click anywhere says it did, until the next thing comes up.
       addEventListener('click', () => {
@@ -689,7 +730,7 @@
       });
 
       const unlockSiren = () => {
-        if (!state.sound) return;
+        if (state.sound === 'off') return;
         openSiren();
         removeEventListener('pointerdown', unlockSiren);
       };
@@ -697,7 +738,7 @@
 
       setTheme(document.documentElement.dataset.theme);
       setCompact(document.documentElement.dataset.compact === 'on');
-      setAlarm(state.alarm);
+      setFlash(state.flash);
       setSound(state.sound);
       syncNotifyUi();
       poll();
