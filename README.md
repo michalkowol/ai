@@ -1,12 +1,19 @@
 # ai
 
-Run Claude Code or Cursor Agent inside a sandboxed Docker container with your
-own shared commands, skills, and rules mounted in.
+Run Claude Code or Cursor Agent inside a sandboxed Docker container.
+
+Slash commands, skills and hooks live in [michalkowol/ai-tools](https://github.com/michalkowol/ai-tools), a Claude Code plugin marketplace. Install it once in a session started with `ai`, and `claude/.claude/` keeps it for every later run:
+
+```
+/plugin marketplace add michalkowol/ai-tools
+/plugin install mk@michalkowol
+```
+
+Cursor Agent also reads the Claude Code plugins kept in `claude/.claude/`, so `ai --cursor` gets the same commands, skills and hooks. Cursor honors the guard hook's deny decisions but ignores its ask decisions, so commands such as `gh pr create` run there without confirmation.
 
 ## Why
 
-Keep AI coding assistants isolated from the host while reusing a single set of
-prompts, slash commands, and configuration across both tools.
+Keep AI coding assistants isolated from the host while reusing a single set of commands, skills and hooks across both tools.
 
 ## Requirements
 
@@ -135,10 +142,6 @@ chmod 600 ~/.ai/settings.env
 ├── dashboard/         # Sessions dashboard: server.py + index.html + PWA manifest, service worker, icons
 ├── claude/            # Per-tool config mounted into the container
 ├── cursor/
-├── common/
-│   ├── commands/      # Shared slash commands
-│   ├── skills/        # Shared skills
-│   └── rules/         # Shared coding rules
 └── config/
     └── claude/        # managed-settings.json -> /etc/claude-code/
 ```
