@@ -228,6 +228,12 @@ case "$TOOL" in
     bash)   CMD=("bash") ;;
 esac
 
+# herdr (https://herdr.dev) cannot see the agent behind docker, so name it on the host-side docker process.
+HERDR_HINT=()
+case "$TOOL" in
+    claude|cursor) HERDR_HINT=(env "HERDR_AGENT=$TOOL") ;;
+esac
+
 if [ -n "$MODEL" ]; then
     case "$TOOL" in
         claude|cursor) CMD+=("--model" "$MODEL") ;;
@@ -266,7 +272,7 @@ trap cleanup EXIT
 trap 'exit 129' HUP
 trap 'exit 143' TERM
 
-docker run -it --rm \
+"${HERDR_HINT[@]}" docker run -it --rm \
     --label "ai.run=$RUN_ID" \
     -v /var/run/docker.sock:/var/run/docker.sock \
     --group-add "$DOCKER_SOCK_GID" \
