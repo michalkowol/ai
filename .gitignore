@@ -8,3 +8,6 @@ cursor/.cursor/*
 
 cursor/.config/cursor/*
 !cursor/.config/cursor/.gitkeep
+
+__pycache__/
+*.pyc
