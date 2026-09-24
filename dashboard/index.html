@@ -449,7 +449,7 @@
         ].filter(Boolean).join(' · ');
         const recent = (transcript.recentTools || []).slice().reverse()
           .map(tool => `<div class="tool"><span class="tag">${esc(tool.name)}</span>${esc(truncate(tool.summary, 70))}</div>`).join('');
-        const acked = state.acked[session.sessionId] === ackKey(session);
+        const acked = !needsAttention(session) || state.acked[session.sessionId] === ackKey(session);
         return `
           <article class="card ${esc(session.status)}${acked ? ' acked' : ''}" style="animation-delay: ${-(now % PULSE_MS)}ms" data-session="${esc(session.sessionId)}" data-status-at="${ackKey(session)}">
             <div>
@@ -549,7 +549,7 @@
             current.waiting = session.statusUpdatedAt;
             announce('Needs input · ' + session.title, truncate(nowText(session), 160), session.sessionId);
           }
-          if (session.status === 'idle' && session.statusUpdatedAt && previous.idle !== session.statusUpdatedAt) {
+          if (session.status === 'idle' && session.statusUpdatedAt && finishedTurn(session) && previous.idle !== session.statusUpdatedAt) {
             current.idle = session.statusUpdatedAt;
             if (known && !state.firstPoll) announce('Finished · ' + session.title, truncate(nowText(session), 160), session.sessionId);
           }
@@ -600,8 +600,13 @@
         siren.timer = null;
       }
 
+      // A session is idle from the moment it starts or resumes, so idle only counts once a turn has ended since then.
+      function finishedTurn(session) {
+        return ((session.transcript || {}).lastTurnEndedAt || 0) > (session.startedAt || 0);
+      }
+
       function needsAttention(session) {
-        return session.live && (session.status === 'waiting' || session.status === 'idle');
+        return session.live && (session.status === 'waiting' || (session.status === 'idle' && finishedTurn(session)));
       }
 
       function refreshAlarm() {

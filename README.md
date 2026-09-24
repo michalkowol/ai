@@ -73,8 +73,9 @@ installed app runs in its own window and keeps the notifications.
   flashing until acknowledged. **Sound on** pings the Nostromo sonar (two low pings) once, **Sound on (loop)**
   repeats it every 6 s. The two are independent and both are remembered
 - both follow the same trigger as the notifications: any session that needs input or has just finished its
-  turn. A click anywhere on the page dismisses them, the next session that needs you brings them back. The
-  browser keeps the sound muted until you have clicked the page once
+  turn, so a session you have just opened or resumed with `ai` stays quiet until its first turn ends. A click
+  anywhere on the page dismisses them, the next session that needs you brings them back. The browser keeps the
+  sound muted until you have clicked the page once
 - **Ntfy** pushes the same alerts to [ntfy.sh](https://ntfy.sh), so they reach your phone: switch it on, type a
   topic into the field next to the button and subscribe to that topic in the ntfy app. Switching it on with a
   topic already set sends a test push. The topic is the only secret, anyone who knows it can read and publish
