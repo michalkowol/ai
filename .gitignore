@@ -8,5 +8,3 @@ cursor/.cursor/*
 
 cursor/.config/cursor/*
 !cursor/.config/cursor/.gitkeep
-
-common/skills/synced/
