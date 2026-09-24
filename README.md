@@ -103,6 +103,14 @@ installed app runs in its own window and keeps the notifications.
 - each container gets a private session registry in `claude/.claude/ai-runs/<run-id>/`,
   removed when the container exits
 
+## herdr
+
+`ai` runs inside [herdr](https://herdr.dev) panes on the host, which keeps the session alive when you close the terminal window or lose the SSH connection and marks each pane working, blocked or idle. herdr finds agents by their process name and only sees `docker` here, so `ai` sets `HERDR_AGENT=claude` (or `cursor`) on the `docker run` process to pick the matching screen detection. The variable stays on the host, the container never gets it, and `--bash` runs without it.
+
+- no `herdr integration install` is needed: the container has its own `~/.claude`, and the state comes from the screen anyway
+- after a herdr server or machine restart herdr brings back the layout but not the session, since its native resume would start `claude` on the host; resume with `ai --resume <session-id>`, the id is on the dashboard card
+- keep the herdr socket out of the container: its API runs arbitrary commands on the host and would break the sandbox
+
 ## GitHub CLI
 
 `gh` comes from the base image's package repository, so its version follows the base you build
