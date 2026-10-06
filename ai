@@ -223,7 +223,7 @@ if [ "$TOOL" = "claude" ]; then
 fi
 
 case "$TOOL" in
-    claude) CMD=("claude" "--dangerously-skip-permissions" "--effort" "max") ;;
+    claude) CMD=("claude" "--dangerously-skip-permissions" "--effort" "medium") ;;
     cursor) CMD=("cursor-agent" "--force") ;;
     bash)   CMD=("bash") ;;
 esac
