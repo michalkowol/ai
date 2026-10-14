@@ -192,6 +192,32 @@ def usage_cost(usage, model):
     return total / 1_000_000
 
 
+def subagent_paths(path):
+    return sorted(glob.glob(os.path.join(os.path.splitext(path)[0], 'subagents', '*.jsonl')))
+
+
+def subagent_usage(path):
+    cost = 0.0
+    tokens = 0
+    priced_messages = set()
+    with open(path, encoding='utf-8', errors='replace') as fh:
+        for line in fh:
+            try:
+                record = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(record, dict) or record.get('type') != 'assistant':
+                continue
+            message = record.get('message') or {}
+            usage = message.get('usage')
+            message_id = message.get('id') or record.get('requestId')
+            if usage and message_id not in priced_messages:
+                priced_messages.add(message_id)
+                cost += usage_cost(usage, message.get('model'))
+                tokens += usage_tokens(usage)
+    return cost, tokens
+
+
 def summarize_transcript(path):
     title = last_prompt = last_assistant_text = branch = model = permission_mode = cost = None
     effort = None
@@ -254,6 +280,10 @@ def summarize_transcript(path):
                     'durationMs': record.get('totalDuration'),
                     'startTime': record.get('startTime')
                 }
+    for subagent_path in subagent_paths(path):
+        subagent_cost, subagent_tokens = subagent_usage(subagent_path)
+        estimated_cost += subagent_cost
+        estimated_tokens += subagent_tokens
     return {
         'title': title,
         'lastPrompt': last_prompt,
@@ -298,9 +328,10 @@ class TranscriptIndex:
     def summary(self, path):
         try:
             stat = os.stat(path)
+            subagent_stats = [os.stat(subagent_path) for subagent_path in subagent_paths(path)]
         except OSError:
             return None
-        key = (stat.st_size, stat.st_mtime_ns)
+        key = tuple((entry.st_size, entry.st_mtime_ns) for entry in [stat] + subagent_stats)
         cached = self.summaries.get(path)
         if cached and cached[0] == key:
             return cached[1]
