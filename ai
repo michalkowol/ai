@@ -146,7 +146,6 @@ if [ -f "$WORKTREE_DIR/.git" ]; then
 fi
 
 AI_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
-cd "$AI_DIR"
 
 case "$IMAGE_KIND" in
     java) BASE_IMAGE="eclipse-temurin:${IMAGE_VERSION}" ;;
@@ -156,9 +155,9 @@ esac
 IMAGE_TAG="ai:${IMAGE_KIND}${IMAGE_VERSION}"
 
 if [ -n "$UPDATE" ]; then
-    docker build -t "$IMAGE_TAG" --build-arg "BASE_IMAGE=${BASE_IMAGE}" --pull --no-cache .
+    docker build -t "$IMAGE_TAG" --build-arg "BASE_IMAGE=${BASE_IMAGE}" --pull --no-cache "$AI_DIR"
 else
-    docker build -q -t "$IMAGE_TAG" --build-arg "BASE_IMAGE=${BASE_IMAGE}" . > /dev/null
+    docker build -q -t "$IMAGE_TAG" --build-arg "BASE_IMAGE=${BASE_IMAGE}" "$AI_DIR" > /dev/null
 fi
 
 RUNS_DIR="$AI_DIR/claude/.claude/ai-runs"
