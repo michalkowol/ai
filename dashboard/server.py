@@ -29,9 +29,15 @@ MODEL_PRICES = {
     'claude-opus-5-5': (4.0, 20.0, 0.2),
     'claude-opus-5': (5.0, 25.0, 0.5),
     'claude-opus-4': (5.0, 25.0, 0.5),
+    'claude-sonnet-5-5': (2.0, 10.0, 0.1),
     'claude-sonnet-5': (2.0, 10.0, 0.2),
     'claude-sonnet-4': (3.0, 15.0, 0.3),
+    'claude-haiku-5-5': (0.1, 0.5, 0.01),
     'claude-haiku-4-5': (1.0, 5.0, 0.1)
+}
+# Prompt-token threshold above which every price of the whole request is multiplied.
+LONG_PROMPT_PRICES = {
+    'claude-haiku-5-5': (100_000, 5.0)
 }
 STATIC_FILES = {
     '/': ('index.html', 'text/html; charset=utf-8'),
@@ -179,6 +185,10 @@ def usage_cost(usage, model):
         total += (creation.get('ephemeral_1h_input_tokens') or 0) * input_price * 2.0
     else:
         total += (usage.get('cache_creation_input_tokens') or 0) * input_price * 1.25
+    if prefix in LONG_PROMPT_PRICES:
+        threshold, multiplier = LONG_PROMPT_PRICES[prefix]
+        if usage_tokens(usage) - (usage.get('output_tokens') or 0) > threshold:
+            total *= multiplier
     return total / 1_000_000
 
 
