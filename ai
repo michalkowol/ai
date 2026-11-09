@@ -201,6 +201,9 @@ if [ -n "$DASHBOARD" ]; then
     ensure_dashboard
 fi
 
+# Bind-mounting a missing file makes Docker create a directory in its place
+[ -f "$AI_DIR/claude/.claude.json" ] || echo '{}' > "$AI_DIR/claude/.claude.json"
+
 CLAUDE_MOUNTS=(
     -v "$AI_DIR/claude/.claude:/home/ubuntu/.claude"
     -v "$AI_DIR/claude/.claude.json:/home/ubuntu/.claude.json"

@@ -2,6 +2,7 @@
 
 claude/.claude/*
 !claude/.claude/.gitkeep
+claude/.claude.json
 
 cursor/.cursor/*
 !cursor/.cursor/.gitkeep
