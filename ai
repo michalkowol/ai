@@ -4,15 +4,13 @@ set -e
 
 TOOL="claude"
 DIR=""
-IMAGE_KIND="java"
-IMAGE_VERSION="21"
 MODEL=""
 RESUME=""
 UPDATE=""
 DASHBOARD="1"
 DASHBOARD_PORT="${AI_DASHBOARD_PORT:-8787}"
 
-USAGE="Usage: ai [--claude|--cursor|--bash] [--java <version>|--node <version>] [--model <model>] [--resume <session-id>] [--update] [--without-dashboard] [path]"
+USAGE="Usage: ai [--claude|--cursor|--bash] [--model <model>] [--resume <session-id>] [--update] [--without-dashboard] [path]"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -26,34 +24,6 @@ while [ $# -gt 0 ]; do
             ;;
         --bash)
             TOOL="bash"
-            shift
-            ;;
-        --java)
-            if [ -z "$2" ]; then
-                echo "Error: --java requires a version argument" >&2
-                exit 1
-            fi
-            IMAGE_KIND="java"
-            IMAGE_VERSION="$2"
-            shift 2
-            ;;
-        --java=*)
-            IMAGE_KIND="java"
-            IMAGE_VERSION="${1#--java=}"
-            shift
-            ;;
-        --node)
-            if [ -z "$2" ]; then
-                echo "Error: --node requires a version argument" >&2
-                exit 1
-            fi
-            IMAGE_KIND="node"
-            IMAGE_VERSION="$2"
-            shift 2
-            ;;
-        --node=*)
-            IMAGE_KIND="node"
-            IMAGE_VERSION="${1#--node=}"
             shift
             ;;
         --model)
@@ -147,17 +117,42 @@ fi
 
 AI_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
-case "$IMAGE_KIND" in
-    java) BASE_IMAGE="eclipse-temurin:${IMAGE_VERSION}" ;;
-    node) BASE_IMAGE="node:${IMAGE_VERSION}" ;;
-esac
+IMAGE_TAG="ai"
 
-IMAGE_TAG="ai:${IMAGE_KIND}${IMAGE_VERSION}"
+# Cached builds finish in a moment, so stay quiet unless the build is slow (first run, Dockerfile change)
+# or fails, and only then stream its output.
+build_image() {
+    local log pid tail_pid="" ticks=0 status=0
+    log="$(mktemp)"
+    trap 'rm -f "$log"' EXIT
+    docker build -t "$IMAGE_TAG" "$AI_DIR" >"$log" 2>&1 &
+    pid=$!
+    while kill -0 "$pid" 2>/dev/null && [ "$ticks" -lt 30 ]; do
+        sleep 0.1
+        ticks=$((ticks + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+        echo "Building image '$IMAGE_TAG' (this can take a few minutes on the first run)..." >&2
+        tail -n +1 -f "$log" >&2 &
+        tail_pid=$!
+    fi
+    wait "$pid" || status=$?
+    if [ -n "$tail_pid" ]; then
+        sleep 0.2
+        kill "$tail_pid" 2>/dev/null || true
+        wait "$tail_pid" 2>/dev/null || true
+    elif [ "$status" -ne 0 ]; then
+        cat "$log" >&2
+    fi
+    rm -f "$log"
+    trap - EXIT
+    return "$status"
+}
 
 if [ -n "$UPDATE" ]; then
-    docker build -t "$IMAGE_TAG" --build-arg "BASE_IMAGE=${BASE_IMAGE}" --pull --no-cache "$AI_DIR"
+    docker build -t "$IMAGE_TAG" --pull --no-cache "$AI_DIR"
 else
-    docker build -q -t "$IMAGE_TAG" --build-arg "BASE_IMAGE=${BASE_IMAGE}" "$AI_DIR" > /dev/null
+    build_image
 fi
 
 RUNS_DIR="$AI_DIR/claude/.claude/ai-runs"

@@ -1,21 +1,26 @@
-ARG BASE_IMAGE=eclipse-temurin:25
-FROM ${BASE_IMAGE}
+FROM ubuntu:24.04
 
-RUN apt-get update && apt-get install -y curl git docker.io gh python3 python3-pip python3-venv sudo \
+RUN apt-get update && apt-get install -y ca-certificates curl git docker.io gh libatomic1 sudo unzip xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
-RUN id ubuntu >/dev/null 2>&1 \
-    || (userdel -r node 2>/dev/null || true; useradd -m -u 1000 -s /bin/bash ubuntu)
+RUN id ubuntu >/dev/null 2>&1 || useradd -m -u 1000 -s /bin/bash ubuntu
 
 RUN echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu \
     && chmod 0440 /etc/sudoers.d/ubuntu
 
 USER ubuntu
 
+ENV PATH="/home/ubuntu/.local/bin:/home/ubuntu/.local/share/mise/shims:$PATH"
+
+RUN curl -fsSL https://mise.run | sh
+RUN mise install node@lts/jod node@lts/lithium python@3.14 java@temurin-11 java@temurin-21 java@temurin-25 \
+    && mise use -g node@lts/lithium python@3.14 java@temurin-25 \
+    && mise reshim
+RUN echo 'eval "$(mise activate bash)"' >> /home/ubuntu/.bashrc
+
 RUN curl https://cursor.com/install -fsS | bash
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
-ENV PATH="/home/ubuntu/.local/bin:$PATH"
 ENV TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal
 
 RUN echo 'echo -e "\\nTo run Claude with skipped permissions, type: \\033[1;32mclaude --dangerously-skip-permissions\\033[0m"' >> /home/ubuntu/.bashrc

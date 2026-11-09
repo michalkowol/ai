@@ -41,26 +41,33 @@ ai                      # Claude Code (default), current directory
 ai --claude path/       # Claude Code in a specific directory
 ai --cursor path/       # Cursor Agent
 ai --bash path/         # Plain bash shell in the container
-ai --java 21            # Build the Java image with a specific version (default: 25)
-ai --node jod           # Build the Node.js image with a specific tag
 ai --model sonnet       # Pick the model (default: opus)
 ai --without-dashboard  # Do not start the sessions dashboard
-ai --java 21 path/      # Combine with any tool/path
+ai --model sonnet path/ # Combine with any tool/path
 ```
 
 The given path is mounted as `/workspace` inside the container. Git worktrees
 are detected and their common git dir is mounted automatically.
 
-The `--java` flag selects the `eclipse-temurin:<version>` base image and tags
-the built image as `ai:java<version>`. The `--node` flag selects the
-`node:<tag>` base image (e.g. `jod` for Node.js 22 LTS) and tags it as
-`ai:node<tag>`. The two flags are mutually exclusive; each variant is cached
-independently.
-
 The `--model` flag picks the model the agent runs with. Claude Code defaults to
 `opus`; pass e.g. `--model sonnet` to override. Cursor Agent uses its own model
 names (`gpt-5`, `sonnet-4-thinking`, …), so the flag is only forwarded there
 when given explicitly. It is not supported with `--bash`.
+
+## Toolchains
+
+The image ships with [mise](https://mise.jdx.dev) and these preinstalled runtimes:
+
+| Tool | Versions | Global default |
+| --- | --- | --- |
+| Node.js | `lts/jod` (22), `lts/lithium` (26) | `lts/lithium` |
+| Python | latest 3.x | latest 3.x |
+| Java (Temurin) | 11, 21, 25 | 25 |
+
+Pick a version per project with a `mise.toml` in the repo (or `mise use java@temurin-21`
+inside the container). mise shims are on `PATH`, so the choice also applies to
+non-interactive commands. Other versions can be added with `mise install`, but they live in
+the container and are gone once it exits.
 
 ## Dashboard
 
@@ -113,8 +120,8 @@ installed app runs in its own window and keeps the notifications.
 
 ## GitHub CLI
 
-`gh` comes from the base image's package repository, so its version follows the base you build
-(`--java` or `--node`) rather than tracking upstream releases.
+`gh` comes from Ubuntu's package repository, so its version follows the Ubuntu release
+rather than tracking upstream releases.
 
 Give it a **dedicated token** — not your own.
 
@@ -145,7 +152,7 @@ chmod 600 ~/.ai/settings.env
 
 ```
 .
-├── Dockerfile         # Configurable base (via --java / --node) + Claude + Cursor + Docker CLI + gh
+├── Dockerfile         # Ubuntu + mise (Node, Python, Java) + Claude + Cursor + Docker CLI + gh
 ├── ai                 # Launcher script
 ├── dashboard/         # Sessions dashboard: server.py + index.html + PWA manifest, service worker, icons
 ├── claude/            # Per-tool config mounted into the container
