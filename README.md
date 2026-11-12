@@ -140,12 +140,12 @@ At [github.com/settings/tokens/new](https://github.com/settings/tokens/new?scope
 
 ### Hand the token to the container
 
-Keep it in `~/.ai/settings.env` on the host, outside this repo, so it is never committed:
+Keep it in `~/.config/ai/settings.env` (or `$XDG_CONFIG_HOME/ai/settings.env`) on the host, outside this repo, so it is never committed:
 
 ```bash
-mkdir -p ~/.ai
-printf 'GH_TOKEN=ghp_...\n' > ~/.ai/settings.env
-chmod 600 ~/.ai/settings.env
+mkdir -p ~/.config/ai
+printf 'GH_TOKEN=ghp_...\n' > ~/.config/ai/settings.env
+chmod 600 ~/.config/ai/settings.env
 ```
 
 ## Layout

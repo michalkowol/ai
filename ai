@@ -98,8 +98,9 @@ if [ -n "$HOST_COMMIT_EMAIL" ]; then
 fi
 
 SETTINGS_ENV=()
-if [ -f "$HOME/.ai/settings.env" ]; then
-    SETTINGS_ENV+=(--env-file "$HOME/.ai/settings.env")
+SETTINGS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/ai/settings.env"
+if [ -f "$SETTINGS_FILE" ]; then
+    SETTINGS_ENV+=(--env-file "$SETTINGS_FILE")
 fi
 
 EXTRA_MOUNTS=()
