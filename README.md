@@ -69,6 +69,15 @@ inside the container). mise shims are on `PATH`, so the choice also applies to
 non-interactive commands. Other versions can be added with `mise install`, but they live in
 the container and are gone once it exits.
 
+### Dependency caches
+
+Downloaded dependencies are shared with the host, so they are not fetched again on every run:
+
+- `~/.m2` is mounted read-write.
+- `~/.gradle` is mounted read-only and used as Gradle's read-only dependency cache, because Gradle's
+  cache locks do not work across the host and containers. New dependencies go to the container's own cache.
+- `~/.npm` is mounted read-write. The npm cache is content-addressed and safe for concurrent use.
+
 ## Dashboard
 
 Every `ai` run starts a single `ai-dashboard` container serving

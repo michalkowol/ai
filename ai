@@ -270,6 +270,9 @@ trap cleanup EXIT
 trap 'exit 129' HUP
 trap 'exit 143' TERM
 
+# Bind-mounting a missing directory makes Docker create it owned by root on Linux hosts
+mkdir -p "$HOME/.npm"
+
 "${HERDR_HINT[@]}" docker run -it --rm \
     --label "ai.run=$RUN_ID" \
     -v /var/run/docker.sock:/var/run/docker.sock \
@@ -278,6 +281,7 @@ trap 'exit 143' TERM
     -v "$HOME/.gradle:/home/ubuntu/.gradle-ro:ro" \
     -e GRADLE_RO_DEP_CACHE=/home/ubuntu/.gradle-ro/caches \
     -v "$HOME/.m2:/home/ubuntu/.m2" \
+    -v "$HOME/.npm:/home/ubuntu/.npm" \
     "${GIT_ENV[@]}" \
     "${SETTINGS_ENV[@]}" \
     -v "$WORKTREE_DIR:/workspace" \
