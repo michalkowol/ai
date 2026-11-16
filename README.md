@@ -148,6 +148,35 @@ printf 'GH_TOKEN=ghp_...\n' > ~/.config/ai/settings.env
 chmod 600 ~/.config/ai/settings.env
 ```
 
+## Browser (Playwright MCP)
+
+The image has no browser. To let the agent drive one, run [Playwright MCP](https://github.com/microsoft/playwright-mcp)
+on the host in a visible window and connect to it from the container over HTTP.
+
+Start it on the host when you need it:
+
+```bash
+npx @playwright/mcp@latest --port 8931 --isolated --allowed-hosts host.docker.internal:8931
+```
+
+- `--isolated` starts every session with a fresh profile, so the agent never sees your cookies or logged-in accounts.
+- `--allowed-hosts` is required: the server only accepts `Host: localhost` by default and answers the container with 403.
+
+Register it once inside the container. It is stored in `claude/.claude.json`, so later runs keep it:
+
+```bash
+claude mcp add --scope user --transport http playwright http://host.docker.internal:8931/mcp
+```
+
+The browser runs on the host, so it reaches host apps at `localhost`. A dev server started inside the
+container is not visible to it unless you publish its port. The browser and the MCP server run with your
+host permissions, and file uploads and downloads use the host file system, so do not leave the server running.
+
+If Claude keeps failing with `SDK auth failed: Dynamic Client Registration rejected`, it saw an error once
+(e.g. the 403 above) and cached the server as needing OAuth. Playwright MCP needs none. Quit Claude, then
+remove the `playwright|…` entry under `mcpOAuth` in `claude/.claude/.credentials.json` and the `playwright`
+key in `claude/.claude/mcp-needs-auth-cache.json`, and start `ai` again.
+
 ## Layout
 
 ```
