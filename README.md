@@ -49,6 +49,9 @@ ai --model sonnet path/ # Combine with any tool/path
 The given path is mounted as `/workspace` inside the container. Git worktrees
 are detected and their common git dir is mounted automatically.
 
+Cursor Agent is installed only in a separate `ai-cursor` image (the `cursor` stage of the Dockerfile),
+built the first time you run `ai --cursor`. Claude Code and `--bash` use the `ai` image without it.
+
 The `--model` flag picks the model the agent runs with. Claude Code defaults to
 `opus`; pass e.g. `--model sonnet` to override. Cursor Agent uses its own model
 names (`gpt-5`, `sonnet-4-thinking`, …), so the flag is only forwarded there
@@ -190,7 +193,7 @@ key in `claude/.claude/mcp-needs-auth-cache.json`, and start `ai` again.
 
 ```
 .
-├── Dockerfile         # Ubuntu + mise (Node, Python, Java) + Claude + Cursor + Docker CLI + gh
+├── Dockerfile         # Ubuntu + mise (Node, Python, Java) + Claude + Docker CLI + gh; Cursor in its own stage
 ├── ai                 # Launcher script
 ├── dashboard/         # Sessions dashboard: server.py + index.html + PWA manifest, service worker, icons
 ├── claude/            # Per-tool config mounted into the container

@@ -118,7 +118,13 @@ fi
 
 AI_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
+# Cursor Agent lives in its own image so Claude and bash runs do not have to install it.
+IMAGE_TARGET="base"
 IMAGE_TAG="ai"
+if [ "$TOOL" = "cursor" ]; then
+    IMAGE_TARGET="cursor"
+    IMAGE_TAG="ai-cursor"
+fi
 
 # Cached builds finish in a moment, so stay quiet unless the build is slow (first run, Dockerfile change)
 # or fails, and only then stream its output.
@@ -126,7 +132,7 @@ build_image() {
     local log pid tail_pid="" ticks=0 status=0
     log="$(mktemp)"
     trap 'rm -f "$log"' EXIT
-    docker build -t "$IMAGE_TAG" "$AI_DIR" >"$log" 2>&1 &
+    docker build --target "$IMAGE_TARGET" -t "$IMAGE_TAG" "$AI_DIR" >"$log" 2>&1 &
     pid=$!
     while kill -0 "$pid" 2>/dev/null && [ "$ticks" -lt 30 ]; do
         sleep 0.1
@@ -151,7 +157,7 @@ build_image() {
 }
 
 if [ -n "$UPDATE" ]; then
-    docker build -t "$IMAGE_TAG" --pull --no-cache "$AI_DIR"
+    docker build --target "$IMAGE_TARGET" -t "$IMAGE_TAG" --pull --no-cache "$AI_DIR"
 else
     build_image
 fi
