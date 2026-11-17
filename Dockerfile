@@ -18,7 +18,10 @@ RUN mise install node@lts/jod node@lts/lithium python@3.14 java@temurin-11 java@
     && mise reshim
 RUN echo 'eval "$(mise activate bash)"' >> /home/ubuntu/.bashrc
 
-RUN curl -fsSL https://claude.ai/install.sh | bash
+# Kept late so a new Claude version only rebuilds the layers from here on (ai --update)
+ARG CLAUDE_VERSION=latest
+LABEL ai.claude-version=$CLAUDE_VERSION
+RUN curl -fsSL https://claude.ai/install.sh | bash -s "$CLAUDE_VERSION"
 
 ENV TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal
 

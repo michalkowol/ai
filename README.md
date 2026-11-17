@@ -44,6 +44,8 @@ ai --bash path/         # Plain bash shell in the container
 ai --model sonnet       # Pick the model (default: opus)
 ai --without-dashboard  # Do not start the sessions dashboard
 ai --model sonnet path/ # Combine with any tool/path
+ai --update             # Update Claude Code to its latest version (rebuilds only its layers)
+ai --update-all         # Rebuild the whole image from scratch with fresh base images
 ```
 
 The given path is mounted as `/workspace` inside the container. Git worktrees
@@ -168,9 +170,11 @@ on the host in a visible window and connect to it from the container over HTTP.
 Start it on the host when you need it:
 
 ```bash
-npx @playwright/mcp@latest --port 8931 --isolated --allowed-hosts host.docker.internal:8931
+npx @playwright/mcp@latest --port 8931 --host 0.0.0.0 --isolated --allowed-hosts host.docker.internal:8931
 ```
 
+- `--host 0.0.0.0` is required: by default the server listens only on `localhost`, which the container cannot reach
+  (ECONNREFUSED). It also exposes the server to your local network, so stop it when you are done.
 - `--isolated` starts every session with a fresh profile, so the agent never sees your cookies or logged-in accounts.
 - `--allowed-hosts` is required: the server only accepts `Host: localhost` by default and answers the container with 403.
 

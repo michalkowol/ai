@@ -6,11 +6,12 @@ TOOL="claude"
 DIR=""
 MODEL=""
 RESUME=""
-UPDATE=""
+UPDATE_CLAUDE=""
+UPDATE_ALL=""
 DASHBOARD="1"
 DASHBOARD_PORT="${AI_DASHBOARD_PORT:-8787}"
 
-USAGE="Usage: ai [--claude|--cursor|--bash] [--model <model>] [--resume <session-id>] [--update] [--without-dashboard] [path]"
+USAGE="Usage: ai [--claude|--cursor|--bash] [--model <model>] [--resume <session-id>] [--update|--update-all] [--without-dashboard] [path]"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -51,7 +52,11 @@ while [ $# -gt 0 ]; do
             shift
             ;;
         --update)
-            UPDATE="1"
+            UPDATE_CLAUDE="1"
+            shift
+            ;;
+        --update-all)
+            UPDATE_ALL="1"
             shift
             ;;
         --without-dashboard)
@@ -126,13 +131,31 @@ if [ "$TOOL" = "cursor" ]; then
     IMAGE_TAG="ai-cursor"
 fi
 
+# The Claude version is a build arg, so pass the one already in the image to keep cached builds cached,
+# and only a newly released one when updating.
+latest_claude_version() {
+    curl -fsSL --max-time 10 https://downloads.claude.ai/claude-code-releases/latest
+}
+
+if [ -n "$UPDATE_CLAUDE" ] || [ -n "$UPDATE_ALL" ]; then
+    CLAUDE_VERSION="$(latest_claude_version)" || {
+        echo "Error: could not fetch the latest Claude Code version" >&2
+        exit 1
+    }
+else
+    CLAUDE_VERSION="$(docker image inspect "$IMAGE_TAG" \
+        --format '{{index .Config.Labels "ai.claude-version"}}' 2>/dev/null || true)"
+    CLAUDE_VERSION="${CLAUDE_VERSION:-latest}"
+fi
+BUILD_ARGS=(--target "$IMAGE_TARGET" --build-arg "CLAUDE_VERSION=$CLAUDE_VERSION" -t "$IMAGE_TAG")
+
 # Cached builds finish in a moment, so stay quiet unless the build is slow (first run, Dockerfile change)
 # or fails, and only then stream its output.
 build_image() {
     local log pid tail_pid="" ticks=0 status=0
     log="$(mktemp)"
     trap 'rm -f "$log"' EXIT
-    docker build --target "$IMAGE_TARGET" -t "$IMAGE_TAG" "$AI_DIR" >"$log" 2>&1 &
+    docker build "${BUILD_ARGS[@]}" "$AI_DIR" >"$log" 2>&1 &
     pid=$!
     while kill -0 "$pid" 2>/dev/null && [ "$ticks" -lt 30 ]; do
         sleep 0.1
@@ -156,8 +179,8 @@ build_image() {
     return "$status"
 }
 
-if [ -n "$UPDATE" ]; then
-    docker build --target "$IMAGE_TARGET" -t "$IMAGE_TAG" --pull --no-cache "$AI_DIR"
+if [ -n "$UPDATE_ALL" ]; then
+    docker build "${BUILD_ARGS[@]}" --pull --no-cache "$AI_DIR"
 else
     build_image
 fi
