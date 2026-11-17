@@ -1,8 +1,6 @@
 {
   "permissions": {
     "deny": [
-      "Bash(git push:*)",
-      "Bash(gh api:*)",
       "Bash(gh repo delete:*)",
       "Bash(gh repo archive:*)",
       "Bash(gh repo unarchive:*)",
@@ -14,7 +12,6 @@
       "Bash(gh issue delete:*)",
       "Bash(gh issue transfer:*)",
       "Bash(gh label delete:*)",
-      "Bash(gh pr merge:*)",
       "Bash(gh secret:*)",
       "Bash(gh variable:*)",
       "Bash(gh ssh-key:*)",
@@ -29,6 +26,9 @@
       "Bash(gh auth setup-git:*)"
     ],
     "ask": [
+      "Bash(git push:*)",
+      "Bash(gh api:*)",
+      "Bash(gh pr merge:*)",
       "Bash(gh pr comment:*)",
       "Bash(gh pr review:*)",
       "Bash(gh pr create:*)",
