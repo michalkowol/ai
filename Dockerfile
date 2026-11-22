@@ -18,6 +18,14 @@ RUN mise install node@lts/jod node@lts/lithium python@3.14 java@temurin-11 java@
     && mise reshim
 RUN echo 'eval "$(mise activate bash)"' >> /home/ubuntu/.bashrc
 
+# Headless Chromium for Playwright MCP. Google Chrome has no arm64 Linux build, so it uses Playwright's Chromium.
+RUN npm install -g @playwright/mcp@latest \
+    && mise reshim \
+    && PLAYWRIGHT="$(npm root -g)/@playwright/mcp/node_modules/playwright/cli.js" \
+    && sudo "$(mise which node)" "$PLAYWRIGHT" install-deps chromium \
+    && node "$PLAYWRIGHT" install chromium \
+    && sudo rm -rf /var/lib/apt/lists/*
+
 # Kept late so a new Claude version only rebuilds the layers from here on (ai --update)
 ARG CLAUDE_VERSION=latest
 LABEL ai.claude-version=$CLAUDE_VERSION

@@ -164,10 +164,28 @@ chmod 600 ~/.config/ai/settings.env
 
 ## Browser (Playwright MCP)
 
-The image has no browser. To let the agent drive one, run [Playwright MCP](https://github.com/microsoft/playwright-mcp)
-on the host in a visible window and connect to it from the container over HTTP.
+The image ships with [Playwright MCP](https://github.com/microsoft/playwright-mcp) and a headless Chromium,
+so the agent can drive a browser inside the container. Google Chrome has no arm64 Linux build, so it uses
+Playwright's Chromium. Register it once inside the container. It is stored in `claude/.claude.json`, so later runs keep it:
 
-Start it on the host when you need it:
+```bash
+claude mcp add --scope user playwright -- playwright-mcp --headless --isolated --browser chromium
+```
+
+- `--headless` is required: the container has no display.
+- `--isolated` keeps the browser profile in memory, so every session starts clean.
+
+The browser runs in the container, so it reaches a dev server started there at `localhost`, and host apps at
+`host.docker.internal`. Screenshots and downloads stay in the container file system unless saved under `/workspace`.
+
+The system libraries Chromium needs are installed too, so Playwright tests in a project can run headless as well.
+Browsers built for a different Playwright version than the one in the image are downloaded with
+`npx playwright install chromium` and live in the container until it exits.
+
+### Visible browser on the host
+
+To watch the browser, add a second server, `playwright-host`, that runs on the host and is reached over HTTP.
+Both stay registered, so you pick one per task, e.g. "use playwright-host". Start it on the host when you need it:
 
 ```bash
 npx @playwright/mcp@latest --port 8931 --host 0.0.0.0 --isolated --allowed-hosts host.docker.internal:8931
@@ -175,29 +193,31 @@ npx @playwright/mcp@latest --port 8931 --host 0.0.0.0 --isolated --allowed-hosts
 
 - `--host 0.0.0.0` is required: by default the server listens only on `localhost`, which the container cannot reach
   (ECONNREFUSED). It also exposes the server to your local network, so stop it when you are done.
-- `--isolated` starts every session with a fresh profile, so the agent never sees your cookies or logged-in accounts.
 - `--allowed-hosts` is required: the server only accepts `Host: localhost` by default and answers the container with 403.
 
-Register it once inside the container. It is stored in `claude/.claude.json`, so later runs keep it:
+Register it once inside the container:
 
 ```bash
-claude mcp add --scope user --transport http playwright http://host.docker.internal:8931/mcp
+claude mcp add --scope user --transport http playwright-host http://host.docker.internal:8931/mcp
 ```
 
-The browser runs on the host, so it reaches host apps at `localhost`. A dev server started inside the
+While the host server is not running, Claude reports `playwright-host` as failed to connect at startup. That is
+expected and does not affect `playwright`.
+
+That browser runs on the host, so it reaches host apps at `localhost`. A dev server started inside the
 container is not visible to it unless you publish its port. The browser and the MCP server run with your
 host permissions, and file uploads and downloads use the host file system, so do not leave the server running.
 
 If Claude keeps failing with `SDK auth failed: Dynamic Client Registration rejected`, it saw an error once
 (e.g. the 403 above) and cached the server as needing OAuth. Playwright MCP needs none. Quit Claude, then
-remove the `playwright|…` entry under `mcpOAuth` in `claude/.claude/.credentials.json` and the `playwright`
+remove the `playwright-host|…` entry under `mcpOAuth` in `claude/.claude/.credentials.json` and the `playwright-host`
 key in `claude/.claude/mcp-needs-auth-cache.json`, and start `ai` again.
 
 ## Layout
 
 ```
 .
-├── Dockerfile         # Ubuntu + mise (Node, Python, Java) + Claude + Docker CLI + gh; Cursor in its own stage
+├── Dockerfile         # Ubuntu + mise (Node, Python, Java) + Playwright MCP + Chromium + Claude + Docker CLI + gh; Cursor in its own stage
 ├── ai                 # Launcher script
 ├── dashboard/         # Sessions dashboard: server.py + index.html + PWA manifest, service worker, icons
 ├── claude/            # Per-tool config mounted into the container
