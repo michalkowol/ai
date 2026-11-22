@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="html-spec" content="1">
+  <title>Worklog mount and host time zone in the ai container</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/global-components.js"></script>
+  <script defer src="assets/local-components.js"></script>
+</head>
+<body>
+<main>
+
+  <spec-header date="2026-11-22" status="implemented">
+    <h1>Worklog mount and host time zone in the ai container</h1>
+    <p>The <code>ai</code> launcher mounts <code>~/.ai/worklog</code> from the host and passes the host time zone, so the agent in the container writes the worklog in local time.</p>
+  </spec-header>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p>Claude Code runs in the <a href="https://github.com/michalkowol/ai">michalkowol/ai</a> container and only sees <code>/workspace</code> and the directories the <code>ai</code> launcher mounts explicitly. The worklog kept by the agent lives on the host in <code>~/.ai/worklog</code> (D43), and its entries must use local time. The launcher patch comes from decisions D44 and D45.</p>
+    <pre><code> # Bind-mounting a missing directory makes Docker create it owned by root on Linux hosts
+ mkdir -p "$HOME/.npm"
++mkdir -p "$HOME/.ai/worklog"
++
++# The image has no tzdata, so pass the POSIX rule (last line of the TZif file), e.g. CET-1CEST,M3.5.0,M10.5.0/3.
++TZ_ENV=()
++HOST_TZ="$(tail -n 1 /etc/localtime 2>/dev/null | LC_ALL=C tr -d '\0' || true)"
++if [[ "$HOST_TZ" =~ ^[A-Za-z\&lt;\&gt;+0-9:,./-]{3,64}$ ]]; then
++    TZ_ENV+=(-e "TZ=$HOST_TZ")
++fi
+
+ "${HERDR_HINT[@]}" docker run -it --rm \
+@@
+     -v "$HOME/.npm:/home/ubuntu/.npm" \
++    -v "$HOME/.ai/worklog:/home/ubuntu/.ai/worklog" \
++    "${TZ_ENV[@]}" \
+     "${GIT_ENV[@]}" \</code></pre>
+    <p>Check inside the container: <code>date</code> shows local time, and <code>ls ~/.ai/worklog</code> works.</p>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <h3>Launcher and image</h3>
+    <ul>
+      <li>Decisions D43, D44 and D45 come from a spec outside this repo. They are only quoted here. <cite>user prompt</cite></li>
+      <li>The launcher already creates <code>~/.npm</code> before <code>docker run</code>, because Docker creates a missing directory as root. <cite><code>ai</code>, comment before <code>mkdir -p "$HOME/.npm"</code></cite></li>
+      <li>The same <code>docker run</code> serves <code>--claude</code>, <code>--cursor</code> and <code>--bash</code>, so the mount and <code>TZ</code> reach all three. The dashboard container has its own <code>docker run</code>. <cite><code>ai</code></cite></li>
+      <li>The mount maps <code>$HOME/.ai/worklog</code> to <code>/home/ubuntu/.ai/worklog</code>: the same path relative to the home directory, but not the same absolute path on macOS (<code>/Users/…</code>). <cite>patch</cite></li>
+      <li><code>~/.config/ai</code> holds the launcher configuration (<code>settings.env</code>). <code>~/.ai/worklog</code> is data for a skill that reports what was done on the previous day. <cite>user, answer to Q2</cite></li>
+      <li>The <code>ai</code> image has no tzdata and no <code>/etc/localtime</code>. By default <code>date</code> shows UTC. <cite><code>docker run ai:latest dpkg -s tzdata; ls /usr/share/zoneinfo</code></cite></li>
+      <li>The host runs Docker Desktop (linuxkit kernel, arm64). <cite><code>uname -a</code> in the container</cite></li>
+    </ul>
+    <h3><code>TZ=CET-1CEST,M3.5.0,M10.5.0/3</code> in the image</h3>
+    <ul>
+      <li><code>date</code>: <code>12:12:20 CET</code>, correct. <code>TZ=Europe/Warsaw</code> without tzdata gives UTC named "Europe". <cite><code>docker run ai:latest date</code></cite></li>
+      <li>Node: <code>GMT+0100 (Central European Standard Time)</code>, and <code>Intl</code> guesses <code>Europe/Brussels</code>. <cite><code>node -e</code></cite></li>
+      <li>Python: <code>+01:00</code>, correct. <cite><code>python3 -c</code></cite></li>
+      <li>Java: <code>+01:00[GMT+01:00]</code>, a fixed offset without the daylight saving switch. <cite><code>jshell</code>, Temurin 25</cite></li>
+      <li>git: commit timestamps <code>+0100</code>. <cite><code>git log --format=%ad</code></cite></li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>The worklog format and content, and the skill that writes and reads it.</li>
+      <li>The dashboard container: the browser renders its times in the host time zone.</li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Decision log</h2>
+
+    <spec-decision did="D1" round="1" from="Q1" topic="Time zone">
+      <p class="q">Where should the container get its time zone from?</p>
+      <spec-option value="A" label="POSIX rule from TZif, as in the patch" recommended chosen>No image change and no rebuild. Java gets a fixed <code>GMT+01:00</code> offset instead of a zone, and historical dates (before the current rules) may get a wrong offset.</spec-option>
+      <spec-option value="B" label="tzdata in the image + IANA name from the host">Add <code>tzdata</code> to the <code>Dockerfile</code> and pass <code>TZ=Europe/Warsaw</code> from <code>readlink /etc/localtime</code>. Correct everywhere, including Java and historical dates, but needs an image rebuild and different zone detection on macOS and Linux.</spec-option>
+      <spec-option value="C" label="Both: IANA name, POSIX as fallback">The most robust, but two code paths in the launcher to maintain.</spec-option>
+      <p class="why">Containers are short-lived and the worklog needs the current local time, which <code>date</code>, Python, Node and git get right. The Java fixed offset and historical dates do not matter for it, so the patch stays as decided in D44 and D45 without touching the image.</p>
+    </spec-decision>
+
+    <spec-decision did="D2" round="1" from="Q2" topic="Worklog">
+      <p class="q">Where should the worklog live on the host?</p>
+      <spec-option value="A" label="~/.ai/worklog, as in D43" recommended chosen>Matches decision D43 and the tool that already writes there. Departs from the XDG direction of <code>c8aeb3a</code>.</spec-option>
+      <spec-option value="B" label="XDG: ~/.local/share/ai/worklog">Consistent with <code>~/.config/ai/settings.env</code>, but D43 and the host-side tool would have to change.</spec-option>
+      <p class="note">This is something else - <code>~/.config/ai</code> really is configuration. <code>~/.ai/worklog</code> only concerns the skill that, based on the worklog generated from ai, tells what I did on the previous day.</p>
+      <p class="why"><code>c8aeb3a</code> moved configuration to XDG. The worklog is skill data, not configuration, so it does not follow that move and stays where D43 put it.</p>
+    </spec-decision>
+
+    <spec-decision did="D3" round="1" from="Q3" topic="Docs">
+      <p class="q">Should the README describe the worklog mount and the time zone?</p>
+      <spec-option value="A" label="Yes, next to &quot;Dependency caches&quot;" recommended chosen>The README already describes every host directory it mounts, so the new one belongs there too.</spec-option>
+      <spec-option value="B" label="No, only comments in ai">Less text, but hidden launcher behaviour.</spec-option>
+      <p class="why">Every other host mount is documented in the README, and the time zone changes what <code>date</code> shows in the container.</p>
+    </spec-decision>
+  </section>
+
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-22-worklog-mount-and-host-timezone.html"></spec-prompt>
+  </section>
+
+</main>
+</body>
+</html>

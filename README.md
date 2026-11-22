@@ -83,6 +83,20 @@ Downloaded dependencies are shared with the host, so they are not fetched again 
   cache locks do not work across the host and containers. New dependencies go to the container's own cache.
 - `~/.npm` is mounted read-write. The npm cache is content-addressed and safe for concurrent use.
 
+### Worklog
+
+`~/.ai/worklog` is mounted read-write at the same path under the container's home directory, created on the host
+if missing. Agents write their worklog there, and a skill reads it to report what was done on the previous day.
+It is data, not configuration, so it stays out of `~/.config/ai`.
+
+### Time zone
+
+The container uses the host time zone, so `date`, logs and git timestamps show local time. The image has no tzdata,
+so `ai` passes `TZ` as the POSIX rule from the last line of the host's `/etc/localtime`
+(e.g. `CET-1CEST,M3.5.0,M10.5.0/3`). If that line is missing or malformed, `TZ` is not set and the container
+falls back to UTC. Java sees a fixed offset (`GMT+01:00`) instead of a zone, so a JVM running across a
+daylight saving switch keeps the old offset.
+
 ## Dashboard
 
 Every `ai` run starts a single `ai-dashboard` container serving

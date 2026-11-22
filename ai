@@ -301,6 +301,14 @@ trap 'exit 143' TERM
 
 # Bind-mounting a missing directory makes Docker create it owned by root on Linux hosts
 mkdir -p "$HOME/.npm"
+mkdir -p "$HOME/.ai/worklog"
+
+# The image has no tzdata, so pass the POSIX rule (last line of the TZif file), e.g. CET-1CEST,M3.5.0,M10.5.0/3.
+TZ_ENV=()
+HOST_TZ="$(tail -n 1 /etc/localtime 2>/dev/null | LC_ALL=C tr -d '\0' || true)"
+if [[ "$HOST_TZ" =~ ^[A-Za-z\<\>+0-9:,./-]{3,64}$ ]]; then
+    TZ_ENV+=(-e "TZ=$HOST_TZ")
+fi
 
 "${HERDR_HINT[@]}" docker run -it --rm \
     --label "ai.run=$RUN_ID" \
@@ -311,6 +319,8 @@ mkdir -p "$HOME/.npm"
     -e GRADLE_RO_DEP_CACHE=/home/ubuntu/.gradle-ro/caches \
     -v "$HOME/.m2:/home/ubuntu/.m2" \
     -v "$HOME/.npm:/home/ubuntu/.npm" \
+    -v "$HOME/.ai/worklog:/home/ubuntu/.ai/worklog" \
+    "${TZ_ENV[@]}" \
     "${GIT_ENV[@]}" \
     "${SETTINGS_ENV[@]}" \
     -v "$WORKTREE_DIR:/workspace" \
