@@ -27,7 +27,6 @@
     ],
     "ask": [
       "Bash(git push:*)",
-      "Bash(gh api:*)",
       "Bash(gh pr merge:*)",
       "Bash(gh pr comment:*)",
       "Bash(gh pr review:*)",
