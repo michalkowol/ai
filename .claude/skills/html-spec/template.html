@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="html-spec" content="1">
+  <title>Cursor pagination for orders API</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/global-components.js"></script>
+  <script defer src="assets/local-components.js"></script>
+</head>
+<body>
+<main>
+
+  <spec-header date="2026-11-18" status="draft">
+    <h1>Cursor pagination for orders API</h1>
+    <p>Replace offset pagination in <code>GET /orders</code> with cursor pagination so deep pages stay fast.</p>
+  </spec-header>
+
+  <section id="questions">
+    <h2>Open questions</h2>
+
+    <spec-question qid="Q3" round="2">
+      <h3>What should the cursor encode?</h3>
+      <p>The cursor is returned in the response and sent back as <code>after</code>.</p>
+      <spec-option value="A" label="Opaque base64 of the last id" recommended>Clients cannot depend on the format, so it can change later.</spec-option>
+      <spec-option value="B" label="Raw last id">Simpler to debug, but becomes a public contract.</spec-option>
+    </spec-question>
+
+    <spec-question qid="Q4" round="2" show-if="Q3=A">
+      <h3>Should the cursor be signed?</h3>
+      <spec-option value="A" label="No" recommended>The cursor only narrows a query the caller is already allowed to run.</spec-option>
+      <spec-option value="B" label="Yes, HMAC">Prevents tampering, needs key rotation.</spec-option>
+    </spec-question>
+
+    <spec-question qid="Q5" round="2" multiple>
+      <h3>Which clients get migrated in this change?</h3>
+      <spec-option value="A" label="Back office" recommended></spec-option>
+      <spec-option value="B" label="Reporting job" recommended></spec-option>
+      <spec-option value="C" label="Public partners API"></spec-option>
+    </spec-question>
+  </section>
+
+  <section id="prompt">
+    <h2>Prompt</h2>
+    <spec-prompt file=".agents/docs/specs/2026-11-18-orders-cursor-pagination.html"></spec-prompt>
+  </section>
+
+  <section id="context">
+    <h2>Context</h2>
+    <p>Offset queries on the orders table get slow past page 200. Clients only move forward through the list.</p>
+  </section>
+
+  <section id="facts">
+    <h2>Facts</h2>
+    <ul>
+      <li><code>orders.id</code> is a monotonically increasing bigint. <cite><code>db/migrations/V1__orders.sql</code></cite></li>
+      <li>Two internal clients call <code>GET /orders?page=</code>. <cite>access logs, last 30 days</cite></li>
+    </ul>
+  </section>
+
+  <section id="out-of-scope">
+    <h2>Out of scope</h2>
+    <ul>
+      <li>Backward pagination</li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Decision log</h2>
+
+    <spec-decision did="D1" round="1" from="Q1" superseded-by="D2">
+      <p class="q">Keep offset pagination as a fallback?</p>
+      <spec-option value="A" label="Yes, behind a query parameter" recommended chosen>Safer rollout.</spec-option>
+      <spec-option value="B" label="No, remove it in the same change">Less code, but no way back.</spec-option>
+      <p class="why">Recommended option accepted.</p>
+    </spec-decision>
+
+    <spec-decision did="D2" round="2" from="Q2">
+      <p class="q">Keep offset pagination as a fallback?</p>
+      <spec-option value="A" label="Yes, behind a query parameter" recommended>Safer rollout.</spec-option>
+      <spec-option value="B" label="No, remove it in the same change" chosen>Less code, but no way back.</spec-option>
+      <p class="note">Both clients deploy on the same day, so a fallback is not needed.</p>
+      <p class="why">Both clients can migrate at once, so a fallback only adds code to delete later.</p>
+    </spec-decision>
+  </section>
+
+</main>
+</body>
+</html>
